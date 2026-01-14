@@ -707,7 +707,10 @@
         if (inMathMode) {
             const fractionMatch = matchFraction(textBefore);
             if (fractionMatch) {
-                let replacement = `\\frac{${fractionMatch.numerator}}{${fractionMatch.denominator}}`;
+                const replacement = `\\frac{${fractionMatch.numerator}}{${fractionMatch.denominator}}`;
+                // Cursor position: inside denominator, after the denominator content
+                // \frac{ = 6, numerator, }{ = 2, denominator
+                const cursorPos = 6 + fractionMatch.numerator.length + 2 + fractionMatch.denominator.length;
 
                 // Check for enclosing brackets to add \left \right
                 const textBeforeMatch = textBefore.substring(0, textBefore.length - fractionMatch.matchLength);
@@ -722,18 +725,18 @@
 
                     if (brackets.openBracket === '\\{') {
                         const wrapped = `\\left\\{ ${replacement} \\right\\}`;
-                        // Cursor after the content: \left\{ + space + replacement
-                        const cursorPos = 8 + replacement.length;
-                        return replaceTextRange(charsBefore + 1, charsAfter + 1, wrapped, cursorPos);
+                        // Cursor inside denominator: \left\{ + space + cursorPos
+                        const wrappedCursorPos = 8 + cursorPos;
+                        return replaceTextRange(charsBefore + 1, charsAfter + 1, wrapped, wrappedCursorPos);
                     } else {
                         const wrapped = `\\left${brackets.openBracket} ${replacement} \\right${brackets.closeBracket}`;
-                        // Cursor after the content: \left( + space + replacement
-                        const cursorPos = 7 + replacement.length;
-                        return replaceTextRange(charsBefore, charsAfter, wrapped, cursorPos);
+                        // Cursor inside denominator: \left( + space + cursorPos
+                        const wrappedCursorPos = 7 + cursorPos;
+                        return replaceTextRange(charsBefore, charsAfter, wrapped, wrappedCursorPos);
                     }
                 }
 
-                return replaceText(fractionMatch.matchLength, replacement, -1);
+                return replaceText(fractionMatch.matchLength, replacement, cursorPos);
             }
         }
 
@@ -983,11 +986,35 @@
     // FRACTION SHORTCUT (x/y -> \frac{x}{y})
     // ========================================
     function matchFraction(textBefore) {
-        // Match patterns like: a/b, x/y, 123/456, (a+b)/c, etc.
+        // Match patterns like: a/b, x/y, 123/456, (a+b)/c, \pi/2, U/\hbar, etc.
         // But NOT if the numerator is part of a LaTeX command like \pi
 
-        // First, try to match LaTeX command as numerator: \cmd/x or \cmd{...}/x
-        // Match \command/denominator (e.g., \pi/2 -> \frac{\pi}{2})
+        // LaTeX command / LaTeX command (e.g., \pi/\hbar -> \frac{\pi}{\hbar})
+        const latexBothMatch = textBefore.match(/(\\[a-zA-Z]+)\/(\\[a-zA-Z]+)$/);
+        if (latexBothMatch) {
+            return {
+                matchLength: latexBothMatch[0].length,
+                numerator: latexBothMatch[1],
+                denominator: latexBothMatch[2]
+            };
+        }
+
+        // Single char / LaTeX command (e.g., U/\hbar -> \frac{U}{\hbar})
+        const charLatexMatch = textBefore.match(/([a-zA-Z0-9])\/(\\[a-zA-Z]+)$/);
+        if (charLatexMatch) {
+            // Check character before the numerator to avoid matching part of a command
+            const charBeforeNumerator = textBefore[textBefore.length - charLatexMatch[0].length - 1];
+            if (charBeforeNumerator && /[a-zA-Z\\]/.test(charBeforeNumerator)) {
+                return null;
+            }
+            return {
+                matchLength: charLatexMatch[0].length,
+                numerator: charLatexMatch[1],
+                denominator: charLatexMatch[2]
+            };
+        }
+
+        // LaTeX command / single char (e.g., \pi/2 -> \frac{\pi}{2})
         const latexCmdMatch = textBefore.match(/(\\[a-zA-Z]+)\/([a-zA-Z0-9])$/);
         if (latexCmdMatch) {
             return {
@@ -997,13 +1024,37 @@
             };
         }
 
-        // Match \command{arg}/denominator (e.g., \hat{H}/2 -> \frac{\hat{H}}{2})
+        // \command{arg} / LaTeX command (e.g., \hat{H}/\hbar)
+        const latexArgLatexMatch = textBefore.match(/(\\[a-zA-Z]+\{[^}]+\})\/(\\[a-zA-Z]+)$/);
+        if (latexArgLatexMatch) {
+            return {
+                matchLength: latexArgLatexMatch[0].length,
+                numerator: latexArgLatexMatch[1],
+                denominator: latexArgLatexMatch[2]
+            };
+        }
+
+        // \command{arg} / single char (e.g., \hat{H}/2 -> \frac{\hat{H}}{2})
         const latexCmdWithArgMatch = textBefore.match(/(\\[a-zA-Z]+\{[^}]+\})\/([a-zA-Z0-9])$/);
         if (latexCmdWithArgMatch) {
             return {
                 matchLength: latexCmdWithArgMatch[0].length,
                 numerator: latexCmdWithArgMatch[1],
                 denominator: latexCmdWithArgMatch[2]
+            };
+        }
+
+        // Single char / \command{arg} (e.g., x/\sqrt{2})
+        const charLatexArgMatch = textBefore.match(/([a-zA-Z0-9])\/(\\[a-zA-Z]+\{[^}]+\})$/);
+        if (charLatexArgMatch) {
+            const charBeforeNumerator = textBefore[textBefore.length - charLatexArgMatch[0].length - 1];
+            if (charBeforeNumerator && /[a-zA-Z\\]/.test(charBeforeNumerator)) {
+                return null;
+            }
+            return {
+                matchLength: charLatexArgMatch[0].length,
+                numerator: charLatexArgMatch[1],
+                denominator: charLatexArgMatch[2]
             };
         }
 
@@ -1034,6 +1085,16 @@
             };
         }
 
+        // Parenthesized numerator / LaTeX command: (...)/\cmd
+        const parenLatexMatch = textBefore.match(/\(([^()]+)\)\/(\\[a-zA-Z]+)$/);
+        if (parenLatexMatch) {
+            return {
+                matchLength: parenLatexMatch[0].length,
+                numerator: parenLatexMatch[1],
+                denominator: parenLatexMatch[2]
+            };
+        }
+
         // Parenthesized numerator only: (...)/x
         const parenNumMatch = textBefore.match(/\(([^()]+)\)\/([a-zA-Z0-9])$/);
         if (parenNumMatch) {
@@ -1051,6 +1112,16 @@
                 matchLength: parenDenMatch[0].length,
                 numerator: parenDenMatch[1],
                 denominator: parenDenMatch[2]
+            };
+        }
+
+        // LaTeX command / parenthesized: \cmd/(...)
+        const latexParenMatch = textBefore.match(/(\\[a-zA-Z]+)\/\(([^()]+)\)$/);
+        if (latexParenMatch) {
+            return {
+                matchLength: latexParenMatch[0].length,
+                numerator: latexParenMatch[1],
+                denominator: latexParenMatch[2]
             };
         }
 
