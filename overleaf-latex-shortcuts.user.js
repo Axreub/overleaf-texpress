@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Overleaf LaTeX Shortcuts
 // @namespace    https://github.com/overleaf-latex-shortcuts
-// @version      1.3.0
+// @version      1.0.1
 // @description  Latex Suite-style snippet expansion for Overleaf
 // @author       Axel Riley
 // @match        https://www.overleaf.com/project/*
@@ -130,8 +130,8 @@
         {trigger: "ooo", replacement: "\\infty", options: "mA"},
         {trigger: "sum", replacement: "\\sum", options: "mA"},
         {trigger: "prod", replacement: "\\prod", options: "mA"},
-        {trigger: "\\sum", replacement: "\\sum_{${0:i}=${1:1}}^{${2:N}} $3", options: "m"},
-        {trigger: "\\prod", replacement: "\\prod_{${0:i}=${1:1}}^{${2:N}} $3", options: "m"},
+        {trigger: "\\sum", replacement: "\\sum_{$0}^{$1} $2", options: "m"},
+        {trigger: "\\prod", replacement: "\\prod_{$0}^{$1} $2", options: "m"},
         {trigger: "lim", replacement: "\\lim_{ ${0:n} \\to ${1:\\infty} } $2", options: "mA"},
         {trigger: "argmin", replacement : "\\operatorname{\argmin}", options: "mA"},
         {trigger: "argmax", replacement : "\\operatorname{\argmax}", options: "mA"},
@@ -343,10 +343,6 @@
     // ========================================
     // STATE
     // ========================================
-    let activeTabstops = [];
-    let currentTabstopIndex = -1;
-    let editorView = null;
-    let queuedExpansion = null;
     let expansionCooldown = false; // Prevent cascading expansions
 
     // ========================================
@@ -361,146 +357,26 @@
     ];
 
     // Add Greek letter word snippets to the main snippets array
+    // Note: No word boundary (w) required - these only work in math mode anyway
+    // This allows "erdipi" to expand the "pi" part even after other characters
     greekLetters.forEach(letter => {
         snippets.push({
             trigger: letter,
             replacement: '\\' + letter,
-            options: 'mAw', // math mode, auto-expand, word boundary required
-            priority: -2    // Lower priority so @a style triggers take precedence
+            options: 'mA', // math mode, auto-expand
+            priority: -2   // Lower priority so @a style triggers take precedence
         });
     });
 
-    // ========================================
-    // CODEMIRROR 6 INTEGRATION
-    // ========================================
-
-    // Find the CodeMirror EditorView instance
-    function findEditorView() {
-        const cmEditor = document.querySelector('.cm-editor');
-        if (!cmEditor) return null;
-
-        // Method 1: Check for view property directly
-        if (cmEditor.cmView && cmEditor.cmView.view) {
-            return cmEditor.cmView.view;
-        }
-
-        // Method 2: Look through Symbol properties (CM6 often uses Symbols)
-        const symbols = Object.getOwnPropertySymbols(cmEditor);
-        for (const sym of symbols) {
-            const val = cmEditor[sym];
-            if (val && typeof val === 'object') {
-                if (val.state && val.dispatch) return val;
-                if (val.view && val.view.state && val.view.dispatch) return val.view;
-            }
-        }
-
-        // Method 3: Search through regular properties
-        for (const key of Object.keys(cmEditor)) {
-            const val = cmEditor[key];
-            if (val && typeof val === 'object' && val.state && val.dispatch) {
-                return val;
-            }
-        }
-
-        // Method 4: Look in .cm-content element
-        const cmContent = document.querySelector('.cm-content');
-        if (cmContent) {
-            for (const sym of Object.getOwnPropertySymbols(cmContent)) {
-                const val = cmContent[sym];
-                if (val && typeof val === 'object') {
-                    if (val.state && val.dispatch) return val;
-                    if (val.view && val.view.state && val.view.dispatch) return val.view;
-                }
-            }
-        }
-
-        // Method 5: Check Overleaf's global objects
-        if (window._ide?.editorManager?.getCurrentDocumentController?.()?.cm6) {
-            return window._ide.editorManager.getCurrentDocumentController().cm6;
-        }
-
-        // Method 6: Look for EditorView in window's CodeMirror modules
-        if (window.CM && window.CM.EditorView) {
-            // Try to find instances
-            const views = document.querySelectorAll('.cm-editor');
-            for (const v of views) {
-                if (v._view) return v._view;
-            }
-        }
-
-        // Method 7: Traverse up the prototype chain looking for view
-        let proto = Object.getPrototypeOf(cmEditor);
-        while (proto && proto !== Object.prototype) {
-            for (const key of Object.getOwnPropertyNames(proto)) {
-                try {
-                    const desc = Object.getOwnPropertyDescriptor(proto, key);
-                    if (desc && desc.get) {
-                        const val = desc.get.call(cmEditor);
-                        if (val && val.state && val.dispatch) return val;
-                    }
-                } catch (e) {}
-            }
-            proto = Object.getPrototypeOf(proto);
-        }
-
-        // Method 8: Last resort - try to find any object with state.doc
-        function deepSearch(obj, depth = 0) {
-            if (depth > 3 || !obj || typeof obj !== 'object') return null;
-            if (obj.state && obj.state.doc && obj.dispatch) return obj;
-            for (const key in obj) {
-                try {
-                    const result = deepSearch(obj[key], depth + 1);
-                    if (result) return result;
-                } catch (e) {}
-            }
-            return null;
-        }
-
-        return deepSearch(cmEditor);
-    }
-
-    // Get text from the document up to cursor position
-    function getTextBeforeCursor(view) {
-        if (!view) return '';
-        const state = view.state;
-        const pos = state.selection.main.head;
-        return state.doc.sliceString(0, pos);
-    }
-
-    // Get cursor position
-    function getCursorPos(view) {
-        if (!view) return 0;
-        return view.state.selection.main.head;
-    }
-
-    // Replace text in the editor using CM6 API
-    function replaceTextInEditor(view, from, to, replacement, cursorOffset = -1) {
-        if (!view) return false;
-
-        // Calculate cursor position
-        let cursorPos;
-        if (cursorOffset >= 0) {
-            cursorPos = from + cursorOffset;
-        } else {
-            cursorPos = from + replacement.length;
-        }
-
-        view.dispatch({
-            changes: { from, to, insert: replacement },
-            selection: { anchor: cursorPos }
-        });
-
-        return true;
-    }
+    // Add vareps and varphi shortcuts
+    snippets.push({ trigger: 'vareps', replacement: '\\varepsilon', options: 'mA', priority: -1 });
+    snippets.push({ trigger: 'varphi', replacement: '\\varphi', options: 'mA', priority: -1 });
 
     // ========================================
-    // FALLBACK: DOM-BASED APPROACH
+    // DOM-BASED TEXT MANIPULATION
     // ========================================
-    // This works when we can't access the CM6 EditorView directly
 
-    let useFallback = false;
-
-    function getTextBeforeCursorFallback() {
+    function getTextBeforeCursor() {
         const selection = window.getSelection();
         if (!selection.rangeCount || !selection.isCollapsed) return '';
 
@@ -556,7 +432,119 @@
         return lineText;
     }
 
-    function replaceTextFallback(matchLength, replacement, cursorOffset = -1) {
+    // Replace text spanning before and after cursor (for bracket wrapping)
+    // charsBefore: number of characters before cursor to include
+    // charsAfter: number of characters after cursor to include
+    function replaceTextRange(charsBefore, charsAfter, replacement, cursorOffset = -1) {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return false;
+
+        try {
+            const range = selection.getRangeAt(0);
+            let container = range.startContainer;
+            let offset = range.startOffset;
+
+            if (container.nodeType !== Node.TEXT_NODE) {
+                return false;
+            }
+
+            // Get all text nodes in the current line (most brackets are on same line)
+            const cmLine = container.parentElement?.closest('.cm-line');
+            if (!cmLine) return false;
+
+            const walker = document.createTreeWalker(cmLine, NodeFilter.SHOW_TEXT, null, false);
+            const textNodes = [];
+            let node;
+            while ((node = walker.nextNode())) {
+                textNodes.push(node);
+            }
+
+            const currentIndex = textNodes.indexOf(container);
+            if (currentIndex === -1) return false;
+
+            // Calculate start position (go back charsBefore characters)
+            let startNode = container;
+            let startOffset = offset - charsBefore;
+
+            if (startOffset < 0) {
+                let remaining = -startOffset;
+                startOffset = 0;
+                for (let i = currentIndex - 1; i >= 0 && remaining > 0; i--) {
+                    const tn = textNodes[i];
+                    if (tn.textContent.length >= remaining) {
+                        startNode = tn;
+                        startOffset = tn.textContent.length - remaining;
+                        remaining = 0;
+                    } else {
+                        remaining -= tn.textContent.length;
+                        startNode = tn;
+                        startOffset = 0;
+                    }
+                }
+                if (remaining > 0) {
+                    console.log('Cannot go back far enough, remaining:', remaining);
+                    return false;
+                }
+            }
+
+            // Calculate end position (go forward charsAfter characters)
+            let endNode = container;
+            let endOffset = offset + charsAfter;
+
+            if (endOffset > container.textContent.length) {
+                let remaining = endOffset - container.textContent.length;
+                for (let i = currentIndex + 1; i < textNodes.length && remaining > 0; i++) {
+                    const tn = textNodes[i];
+                    if (tn.textContent.length >= remaining) {
+                        endNode = tn;
+                        endOffset = remaining;
+                        remaining = 0;
+                    } else {
+                        remaining -= tn.textContent.length;
+                    }
+                }
+                if (remaining > 0) {
+                    console.log('Cannot go forward far enough, remaining:', remaining);
+                    return false;
+                }
+            }
+
+            // Create selection range and replace
+            const newRange = document.createRange();
+            newRange.setStart(startNode, startOffset);
+            newRange.setEnd(endNode, endOffset);
+
+            selection.removeAllRanges();
+            selection.addRange(newRange);
+
+            document.execCommand('insertText', false, replacement);
+
+            // Position cursor if specified
+            if (cursorOffset >= 0 && cursorOffset < replacement.length) {
+                const currentRange = selection.getRangeAt(0);
+                let cursorNode = currentRange.startContainer;
+                let cursorPos = currentRange.startOffset;
+
+                if (cursorNode.nodeType === Node.TEXT_NODE) {
+                    const moveBack = replacement.length - cursorOffset;
+                    if (cursorPos >= moveBack) {
+                        const finalRange = document.createRange();
+                        finalRange.setStart(cursorNode, cursorPos - moveBack);
+                        finalRange.setEnd(cursorNode, cursorPos - moveBack);
+                        selection.removeAllRanges();
+                        selection.addRange(finalRange);
+                    }
+                }
+            }
+
+            return true;
+        } catch (e) {
+            console.error('Overleaf LaTeX Shortcuts: replaceTextRange error:', e);
+            return false;
+        }
+    }
+
+    function replaceText(matchLength, replacement, cursorOffset = -1) {
         const selection = window.getSelection();
         if (!selection.rangeCount) return false;
 
@@ -647,19 +635,57 @@
             // Now position cursor at the right place if cursorOffset is specified
             if (cursorOffset >= 0 && cursorOffset < replacement.length) {
                 // We need to move cursor back from end of replacement
-                const moveBack = replacement.length - cursorOffset;
+                let moveBack = replacement.length - cursorOffset;
 
                 // Get current selection (should be at end of inserted text)
                 const currentRange = selection.getRangeAt(0);
                 let cursorNode = currentRange.startContainer;
                 let cursorPos = currentRange.startOffset;
 
-                if (cursorNode.nodeType === Node.TEXT_NODE && cursorPos >= moveBack) {
-                    const finalRange = document.createRange();
-                    finalRange.setStart(cursorNode, cursorPos - moveBack);
-                    finalRange.setEnd(cursorNode, cursorPos - moveBack);
-                    selection.removeAllRanges();
-                    selection.addRange(finalRange);
+                // Handle multi-line replacements: walk backwards through nodes
+                if (cursorNode.nodeType === Node.TEXT_NODE) {
+                    if (cursorPos >= moveBack) {
+                        // Simple case: cursor offset is within current node
+                        const finalRange = document.createRange();
+                        finalRange.setStart(cursorNode, cursorPos - moveBack);
+                        finalRange.setEnd(cursorNode, cursorPos - moveBack);
+                        selection.removeAllRanges();
+                        selection.addRange(finalRange);
+                    } else {
+                        // Multi-line case: need to traverse backwards through nodes
+                        moveBack -= cursorPos;
+
+                        // Get all text nodes in cm-content and find our position
+                        const cmContent = document.querySelector('.cm-content');
+                        if (cmContent) {
+                            const allTextNodes = [];
+                            const walker = document.createTreeWalker(cmContent, NodeFilter.SHOW_TEXT, null, false);
+                            let node;
+                            while ((node = walker.nextNode())) {
+                                allTextNodes.push(node);
+                            }
+
+                            // Find index of current node
+                            const currentIndex = allTextNodes.indexOf(cursorNode);
+
+                            // Walk backwards
+                            for (let i = currentIndex - 1; i >= 0 && moveBack > 0; i--) {
+                                const tn = allTextNodes[i];
+                                const len = tn.textContent.length;
+                                // Account for newline between nodes (cm-line elements)
+                                moveBack--; // for the newline
+                                if (moveBack <= len) {
+                                    const finalRange = document.createRange();
+                                    finalRange.setStart(tn, len - moveBack);
+                                    finalRange.setEnd(tn, len - moveBack);
+                                    selection.removeAllRanges();
+                                    selection.addRange(finalRange);
+                                    break;
+                                }
+                                moveBack -= len;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -670,23 +696,49 @@
         }
     }
 
-    function tryExpandFallback() {
-        const textBefore = getTextBeforeCursorFallback();
+    function tryExpand() {
+        const textBefore = getTextBeforeCursor();
         if (!textBefore || textBefore.length < 2) return false;
 
+        const textAfter = getTextAfterCursor(50);
         const inMathMode = isInMathMode(textBefore, textBefore.length);
 
         // Check for fraction shortcut first (only in math mode)
         if (inMathMode) {
             const fractionMatch = matchFraction(textBefore);
             if (fractionMatch) {
-                const replacement = `\\frac{${fractionMatch.numerator}}{${fractionMatch.denominator}}`;
-                return replaceTextFallback(fractionMatch.matchLength, replacement, -1);
+                let replacement = `\\frac{${fractionMatch.numerator}}{${fractionMatch.denominator}}`;
+
+                // Check for enclosing brackets to add \left \right
+                const textBeforeMatch = textBefore.substring(0, textBefore.length - fractionMatch.matchLength);
+                const brackets = findEnclosingBrackets(textBeforeMatch, textAfter);
+
+                if (brackets) {
+                    // Calculate chars from cursor to opening bracket
+                    // brackets.openIndex is position in textBeforeMatch, need distance from end
+                    const distanceToOpen = textBeforeMatch.length - brackets.openIndex;
+                    const charsBefore = fractionMatch.matchLength + distanceToOpen;
+                    const charsAfter = brackets.closeIndex + 1;
+
+                    if (brackets.openBracket === '\\{') {
+                        const wrapped = `\\left\\{ ${replacement} \\right\\}`;
+                        // Cursor after the content: \left\{ + space + replacement
+                        const cursorPos = 8 + replacement.length;
+                        return replaceTextRange(charsBefore + 1, charsAfter + 1, wrapped, cursorPos);
+                    } else {
+                        const wrapped = `\\left${brackets.openBracket} ${replacement} \\right${brackets.closeBracket}`;
+                        // Cursor after the content: \left( + space + replacement
+                        const cursorPos = 7 + replacement.length;
+                        return replaceTextRange(charsBefore, charsAfter, wrapped, cursorPos);
+                    }
+                }
+
+                return replaceText(fractionMatch.matchLength, replacement, -1);
             }
         }
 
         // Check for regular snippets
-        const match = matchSnippet(textBefore, inMathMode);
+        const match = matchSnippet(textBefore, inMathMode, textAfter);
         if (match) {
             let replacement = match.snippet.replacement;
 
@@ -697,10 +749,42 @@
                 }
             }
 
+            // Check for big operators that should get \left \right when inside brackets
+            const triggerStr = String(match.snippet.trigger);
+            const bigOps = ['sum', 'prod', 'int', 'lim', 'oint', 'iint', 'iiint', 'bigcup', 'bigcap'];
+            const isBigOp = bigOps.some(op => triggerStr === op || triggerStr.endsWith(op));
+
+            if (isBigOp && inMathMode) {
+                const textBeforeMatch = textBefore.substring(0, textBefore.length - match.matchLength);
+                const brackets = findEnclosingBrackets(textBeforeMatch, textAfter);
+
+                if (brackets) {
+                    // Calculate chars from cursor to opening bracket
+                    const distanceToOpen = textBeforeMatch.length - brackets.openIndex;
+                    const charsBefore = match.matchLength + distanceToOpen;
+                    const charsAfter = brackets.closeIndex + 1;
+
+                    // Process tabstops first
+                    const { text: processedReplacement } = processReplacement(replacement);
+
+                    if (brackets.openBracket === '\\{') {
+                        const wrappedReplacement = `\\left\\{ ${processedReplacement} \\right\\}`;
+                        // Cursor after the content: \left\{ + space + content
+                        const cursorPos = 8 + processedReplacement.length;
+                        return replaceTextRange(charsBefore + 1, charsAfter + 1, wrappedReplacement, cursorPos);
+                    } else {
+                        const wrappedReplacement = `\\left${brackets.openBracket} ${processedReplacement} \\right${brackets.closeBracket}`;
+                        // Cursor after the content: \left( + space + content
+                        const cursorPos = 7 + processedReplacement.length;
+                        return replaceTextRange(charsBefore, charsAfter, wrappedReplacement, cursorPos);
+                    }
+                }
+            }
+
             // Process tabstops
             const { text, cursorOffset } = processReplacement(replacement);
 
-            return replaceTextFallback(match.matchLength, text, cursorOffset);
+            return replaceText(match.matchLength, text, cursorOffset);
         }
 
         return false;
@@ -772,7 +856,7 @@
     // ========================================
     // SNIPPET MATCHING
     // ========================================
-    function matchSnippet(textBefore, inMathMode) {
+    function matchSnippet(textBefore, inMathMode, textAfter = '') {
         // Sort by priority (higher priority first), then by trigger length (longer first)
         const sortedSnippets = [...snippets].sort((a, b) => {
             const prioA = a.priority || 0;
@@ -796,7 +880,36 @@
             if (needsText && inMathMode) continue;
 
             // Skip function replacements for now (not supported in this version)
-            if (typeof snippet.replacement === 'function') continue;
+            // if (typeof snippet.replacement === 'function') continue;
+
+            // Skip snippets with unresolved variables like ${GREEK}, ${SYMBOL}
+            const triggerStr = snippet.trigger instanceof RegExp ? snippet.trigger.source : String(snippet.trigger);
+            if (triggerStr.includes('${GREEK}') || triggerStr.includes('${SYMBOL}') || triggerStr.includes('${MORE_SYMBOLS}')) {
+                continue;
+            }
+
+            // Skip single-character special triggers that cause issues
+            if (typeof snippet.trigger === 'string' && snippet.trigger.length === 1) {
+                // Skip quote and caret triggers which are problematic
+                if ('"\'^'.includes(snippet.trigger)) {
+                    continue;
+                }
+                // For bracket triggers, only expand if NOT already followed by matching close bracket
+                // This prevents re-expansion when user deletes closing bracket or edits existing brackets
+                const bracketPairs = { '(': ')', '[': ']', '{': '}' };
+                if (bracketPairs[snippet.trigger] && textAfter.length > 0) {
+                    const expectedClose = bracketPairs[snippet.trigger];
+                    if (textAfter[0] === expectedClose) {
+                        // Already has closing bracket, don't expand
+                        continue;
+                    }
+                }
+            }
+
+            // Skip snippets with ${VISUAL} - visual mode not supported
+            if (typeof snippet.replacement === 'string' && snippet.replacement.includes('${VISUAL}')) {
+                continue;
+            }
 
             let match = null;
             let matchLength = 0;
@@ -808,19 +921,24 @@
             if (isRegExp || isRegexOption) {
                 // Handle both RegExp objects and string patterns with 'r' option
                 let regex;
-                if (isRegExp) {
-                    // Convert RegExp to string and wrap for end-of-string matching
-                    const source = trigger.source;
-                    regex = new RegExp('(' + source + ')$');
-                } else {
-                    regex = new RegExp('(' + trigger + ')$');
-                }
+                try {
+                    if (isRegExp) {
+                        // Convert RegExp to string and wrap for end-of-string matching
+                        const source = trigger.source;
+                        regex = new RegExp('(' + source + ')$');
+                    } else {
+                        regex = new RegExp('(' + trigger + ')$');
+                    }
 
-                match = textBefore.match(regex);
-                if (match) {
-                    matchLength = match[1].length;
-                    // Capture groups for replacement (skip the full match and first group)
-                    captures = match.slice(2);
+                    match = textBefore.match(regex);
+                    if (match) {
+                        matchLength = match[1].length;
+                        // Capture groups for replacement (skip the full match and first group)
+                        captures = match.slice(2);
+                    }
+                } catch (e) {
+                    // Invalid regex, skip this snippet
+                    continue;
                 }
             } else if (typeof trigger === 'string') {
                 // Plain text trigger
@@ -832,6 +950,18 @@
                             continue;
                         }
                     }
+
+                    // Prevent double backslash: if replacement starts with backslash
+                    // and there's already a backslash before the trigger, skip
+                    const replacementStr = typeof snippet.replacement === 'string' ? snippet.replacement : '';
+                    if (replacementStr.startsWith('\\')) {
+                        const charBefore = textBefore[textBefore.length - trigger.length - 1];
+                        if (charBefore === '\\') {
+                            // Already has a backslash, skip to prevent \\command
+                            continue;
+                        }
+                    }
+
                     match = true;
                     matchLength = trigger.length;
                 }
@@ -854,9 +984,39 @@
     // ========================================
     function matchFraction(textBefore) {
         // Match patterns like: a/b, x/y, 123/456, (a+b)/c, etc.
+        // But NOT if the numerator is part of a LaTeX command like \pi
+
+        // First, try to match LaTeX command as numerator: \cmd/x or \cmd{...}/x
+        // Match \command/denominator (e.g., \pi/2 -> \frac{\pi}{2})
+        const latexCmdMatch = textBefore.match(/(\\[a-zA-Z]+)\/([a-zA-Z0-9])$/);
+        if (latexCmdMatch) {
+            return {
+                matchLength: latexCmdMatch[0].length,
+                numerator: latexCmdMatch[1],
+                denominator: latexCmdMatch[2]
+            };
+        }
+
+        // Match \command{arg}/denominator (e.g., \hat{H}/2 -> \frac{\hat{H}}{2})
+        const latexCmdWithArgMatch = textBefore.match(/(\\[a-zA-Z]+\{[^}]+\})\/([a-zA-Z0-9])$/);
+        if (latexCmdWithArgMatch) {
+            return {
+                matchLength: latexCmdWithArgMatch[0].length,
+                numerator: latexCmdWithArgMatch[1],
+                denominator: latexCmdWithArgMatch[2]
+            };
+        }
+
         // Simple version: single char or number / single char or number
+        // But check that the char before numerator is not a backslash or letter (part of command)
         const simpleMatch = textBefore.match(/([a-zA-Z0-9])\/([a-zA-Z0-9])$/);
         if (simpleMatch) {
+            // Check character before the numerator
+            const charBeforeNumerator = textBefore[textBefore.length - 4]; // char before "x/y"
+            // If it's a backslash or letter, this might be part of a LaTeX command - skip
+            if (charBeforeNumerator && /[a-zA-Z\\]/.test(charBeforeNumerator)) {
+                return null;
+            }
             return {
                 matchLength: 3,
                 numerator: simpleMatch[1],
@@ -914,68 +1074,111 @@
             return defaultVal;
         });
 
-        // Find $0 position (this is where cursor should go)
-        const dollar0Match = result.match(/\$0/);
-        if (dollar0Match) {
-            cursorOffset = dollar0Match.index;
-        }
+        // Find $0 position and mark it with a unique placeholder
+        // This ensures cursor position is calculated correctly after other $n markers are removed
+        const cursorPlaceholder = '\u200B\u200B\u200B'; // Zero-width spaces as unique marker
+        result = result.replace(/\$0/, cursorPlaceholder);
 
-        // Remove all $n markers
+        // Remove all other $n markers
         result = result.replace(/\$(\d+)/g, '');
+
+        // Now find where the cursor placeholder is and calculate offset
+        const placeholderIndex = result.indexOf(cursorPlaceholder);
+        if (placeholderIndex !== -1) {
+            cursorOffset = placeholderIndex;
+            // Remove the placeholder
+            result = result.replace(cursorPlaceholder, '');
+        }
 
         return { text: result, cursorOffset };
     }
 
     // ========================================
-    // EXPANSION LOGIC
+    // BRACKET DETECTION FOR AUTO \left \right
     // ========================================
-    function tryExpand(view) {
-        if (!view) return false;
+    // Searches backwards through text to find an unmatched opening bracket
+    // Returns { openBracket, openIndex, closeBracket } or null
+    function findEnclosingBrackets(textBefore, textAfter) {
+        const pairs = { '(': ')', '[': ']' };
+        const openBrackets = ['(', '['];
+        const closeBrackets = [')', ']'];
 
-        const textBefore = getTextBeforeCursor(view);
-        if (!textBefore) return false;
+        // Stack to track bracket nesting
+        // We scan backwards through textBefore
+        let stack = [];
 
-        const cursorPos = getCursorPos(view);
-        const inMathMode = isInMathMode(textBefore, textBefore.length);
+        for (let i = textBefore.length - 1; i >= 0; i--) {
+            const char = textBefore[i];
 
-        // Check for fraction shortcut first (only in math mode)
-        if (inMathMode) {
-            const fractionMatch = matchFraction(textBefore);
-            if (fractionMatch) {
-                const replacement = `\\frac{${fractionMatch.numerator}}{${fractionMatch.denominator}}`;
-                const from = cursorPos - fractionMatch.matchLength;
-                replaceTextInEditor(view, from, cursorPos, replacement, -1);
-                return true;
-            }
-        }
+            if (closeBrackets.includes(char)) {
+                // Found a closing bracket, push to stack
+                stack.push(char);
+            } else if (openBrackets.includes(char)) {
+                // Found an opening bracket
+                if (stack.length > 0 && pairs[char] === stack[stack.length - 1]) {
+                    // This matches a closing bracket we saw, pop it
+                    stack.pop();
+                } else {
+                    // This is an unmatched opening bracket!
+                    // Now check if textAfter has the matching closing bracket
+                    const expectedClose = pairs[char];
 
-        // Check for regular snippets
-        const match = matchSnippet(textBefore, inMathMode);
-        if (match) {
-            let replacement = match.snippet.replacement;
-
-            // Handle regex captures [[0]], [[1]], etc.
-            if (match.captures && match.captures.length > 0) {
-                for (let i = 0; i < match.captures.length; i++) {
-                    replacement = replacement.replace(new RegExp(`\\[\\[${i}\\]\\]`, 'g'), match.captures[i]);
+                    // Scan forward through textAfter to find matching close
+                    let depth = 1;
+                    for (let j = 0; j < textAfter.length && depth > 0; j++) {
+                        const afterChar = textAfter[j];
+                        if (afterChar === char) {
+                            depth++;
+                        } else if (afterChar === expectedClose) {
+                            depth--;
+                            if (depth === 0) {
+                                // Found the matching close!
+                                return {
+                                    openBracket: char,
+                                    openIndex: i,
+                                    closeBracket: expectedClose,
+                                    closeIndex: j
+                                };
+                            }
+                        }
+                    }
+                    // No matching close found, continue searching backwards
                 }
             }
-
-            // Process tabstops
-            const { text, cursorOffset } = processReplacement(replacement);
-
-            const from = cursorPos - match.matchLength;
-            replaceTextInEditor(view, from, cursorPos, text, cursorOffset);
-            return true;
         }
 
-        return false;
+        // Also check for \{ ... \} pattern
+        for (let i = textBefore.length - 1; i >= 1; i--) {
+            if (textBefore[i] === '{' && textBefore[i - 1] === '\\') {
+                // Found \{, check for \} in textAfter
+                for (let j = 0; j < textAfter.length - 1; j++) {
+                    if (textAfter[j] === '\\' && textAfter[j + 1] === '}') {
+                        return {
+                            openBracket: '\\{',
+                            openIndex: i - 1,
+                            closeBracket: '\\}',
+                            closeIndex: j
+                        };
+                    }
+                }
+            }
+        }
+
+        return null;
     }
 
     // ========================================
     // KEYBOARD HANDLING
     // ========================================
+    let lastProcessedEvent = null;
+
     function handleKeyUp(e) {
+        // Prevent processing the same event twice (from both cm and document listeners)
+        if (lastProcessedEvent === e) {
+            return;
+        }
+        lastProcessedEvent = e;
+
         // Skip if we just did an expansion (prevent cascading)
         if (expansionCooldown) {
             return;
@@ -986,41 +1189,126 @@
             return;
         }
 
-        // Skip navigation keys that don't produce text
+        // Skip navigation and deletion keys that don't produce new text
         if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight',
              'Home', 'End', 'PageUp', 'PageDown',
              'Escape', 'Tab', 'Enter', 'F1', 'F2', 'F3', 'F4',
-             'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12'].includes(e.key)) {
+             'F5', 'F6', 'F7', 'F8', 'F9', 'F10', 'F11', 'F12',
+             'Backspace', 'Delete'].includes(e.key)) {
             return;
         }
 
+        // Set cooldown immediately to prevent any cascading during this expansion
+        expansionCooldown = true;
+
         // Small delay to let the editor update its state
         setTimeout(() => {
-            let expanded = false;
+            const expanded = tryExpand();
 
-            if (useFallback) {
-                expanded = tryExpandFallback();
-            } else if (editorView) {
-                expanded = tryExpand(editorView);
+            // Reset cooldown after a delay (longer if we expanded)
+            setTimeout(() => {
+                expansionCooldown = false;
+            }, expanded ? 100 : 20);
+        }, 10);
+    }
+
+    function getTextAfterCursor(length = 1) {
+        const selection = window.getSelection();
+        if (!selection.rangeCount || !selection.isCollapsed) return '';
+
+        const range = selection.getRangeAt(0);
+        let container = range.startContainer;
+        let offset = range.startOffset;
+
+        if (container.nodeType === Node.TEXT_NODE) {
+            // Get text after cursor in current node
+            const textAfter = container.textContent.substring(offset, offset + length);
+            if (textAfter.length >= length) {
+                return textAfter;
+            }
+            // Need to look at next text node
+            const cmLine = container.parentElement?.closest('.cm-line');
+            if (cmLine) {
+                const walker = document.createTreeWalker(cmLine, NodeFilter.SHOW_TEXT, null, false);
+                let node;
+                let foundCurrent = false;
+                let result = textAfter;
+                while ((node = walker.nextNode()) && result.length < length) {
+                    if (node === container) {
+                        foundCurrent = true;
+                        continue;
+                    }
+                    if (foundCurrent) {
+                        result += node.textContent.substring(0, length - result.length);
+                    }
+                }
+                return result;
+            }
+            return textAfter;
+        }
+        return '';
+    }
+
+    function moveCursorForward(chars = 1) {
+        const selection = window.getSelection();
+        if (!selection.rangeCount) return false;
+
+        const range = selection.getRangeAt(0);
+        let container = range.startContainer;
+        let offset = range.startOffset;
+
+        if (container.nodeType === Node.TEXT_NODE) {
+            const remaining = container.textContent.length - offset;
+            if (remaining >= chars) {
+                // Simple case: can move within current node
+                const newRange = document.createRange();
+                newRange.setStart(container, offset + chars);
+                newRange.setEnd(container, offset + chars);
+                selection.removeAllRanges();
+                selection.addRange(newRange);
+                return true;
             } else {
-                // Try to find view again
-                editorView = findEditorView();
-                if (editorView) {
-                    expanded = tryExpand(editorView);
-                } else {
-                    // Use fallback
-                    expanded = tryExpandFallback();
+                // Need to move to next text node
+                let toMove = chars - remaining;
+                const cmLine = container.parentElement?.closest('.cm-line');
+                if (cmLine) {
+                    const walker = document.createTreeWalker(cmLine, NodeFilter.SHOW_TEXT, null, false);
+                    let node;
+                    let foundCurrent = false;
+                    while ((node = walker.nextNode())) {
+                        if (node === container) {
+                            foundCurrent = true;
+                            continue;
+                        }
+                        if (foundCurrent) {
+                            if (node.textContent.length >= toMove) {
+                                const newRange = document.createRange();
+                                newRange.setStart(node, toMove);
+                                newRange.setEnd(node, toMove);
+                                selection.removeAllRanges();
+                                selection.addRange(newRange);
+                                return true;
+                            }
+                            toMove -= node.textContent.length;
+                        }
+                    }
                 }
             }
+        }
+        return false;
+    }
 
-            // If we expanded something, set cooldown to prevent cascading
-            if (expanded) {
-                expansionCooldown = true;
-                setTimeout(() => {
-                    expansionCooldown = false;
-                }, 50); // 50ms cooldown
+    function handleKeyDown(e) {
+        if (e.key === 'Tab') {
+            // Check if we are inside brackets and should jump out
+            const textAfter = getTextAfterCursor(1);
+            if (textAfter && /[)\]}]/.test(textAfter[0])) {
+                e.preventDefault();
+                e.stopPropagation();
+                moveCursorForward(1);
+                return;
             }
-        }, 10);
+        }
     }
 
     // ========================================
@@ -1030,37 +1318,13 @@
         console.log('Overleaf LaTeX Shortcuts: Initializing...');
 
         // Wait for the editor to be ready
-        let attempts = 0;
         const checkEditor = setInterval(() => {
-            attempts++;
             const cmEditor = document.querySelector('.cm-editor');
 
             if (cmEditor) {
-                // Debug: Log what properties exist on the element
-                if (attempts === 1) {
-                    console.log('Overleaf LaTeX Shortcuts: Found .cm-editor element');
-                    console.log('  - Regular properties:', Object.keys(cmEditor).slice(0, 10));
-                    console.log('  - Symbol properties:', Object.getOwnPropertySymbols(cmEditor).length);
-                }
-
-                editorView = findEditorView();
-
-                if (editorView) {
-                    clearInterval(checkEditor);
-                    console.log('Overleaf LaTeX Shortcuts: EditorView found! Using CM6 API.');
-                    console.log('  - Has state:', !!editorView.state);
-                    console.log('  - Has dispatch:', !!editorView.dispatch);
-                    setupListeners(cmEditor);
-                } else if (attempts >= 10) {
-                    // After 5 seconds, switch to fallback mode
-                    clearInterval(checkEditor);
-                    useFallback = true;
-                    console.log('Overleaf LaTeX Shortcuts: EditorView not found, using fallback mode.');
-                    console.log('  - Fallback uses DOM manipulation with execCommand');
-                    setupListeners(cmEditor);
-                } else if (attempts <= 3) {
-                    console.log('Overleaf LaTeX Shortcuts: Attempt', attempts, '- searching for EditorView...');
-                }
+                clearInterval(checkEditor);
+                console.log('Overleaf LaTeX Shortcuts: Editor found, setting up listeners.');
+                setupListeners(cmEditor);
             }
         }, 500);
 
@@ -1068,9 +1332,8 @@
         setTimeout(() => {
             clearInterval(checkEditor);
             const cmEditor = document.querySelector('.cm-editor');
-            if (cmEditor && !editorView && !useFallback) {
-                useFallback = true;
-                console.log('Overleaf LaTeX Shortcuts: Final timeout, using fallback mode.');
+            if (cmEditor) {
+                console.log('Overleaf LaTeX Shortcuts: Final timeout, setting up listeners.');
                 setupListeners(cmEditor);
             }
         }, 30000);
@@ -1079,11 +1342,18 @@
     function setupListeners(cmEditor) {
         // Attach keyup listener to the editor
         cmEditor.addEventListener('keyup', handleKeyUp, true);
+        cmEditor.addEventListener('keydown', handleKeyDown, true);
 
         // Also try document-level listener as backup
         document.addEventListener('keyup', (e) => {
             if (e.target.closest && e.target.closest('.cm-editor')) {
                 handleKeyUp(e);
+            }
+        }, true);
+
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Tab' && e.target.closest && e.target.closest('.cm-editor')) {
+                handleKeyDown(e);
             }
         }, true);
 
@@ -1098,20 +1368,22 @@
     // ========================================
     window.testSnippets = function() {
         const testCases = [
-            // [input text before cursor, expected match trigger, expected output, is math mode]
-            { input: '$@a', inMath: true, expectTrigger: '@a', expectOutput: '\\alpha' },
-            { input: '$@b', inMath: true, expectTrigger: '@b', expectOutput: '\\beta' },
-            { input: '$gamma', inMath: true, expectTrigger: 'gamma', expectOutput: '\\gamma' },
-            { input: '$pi', inMath: true, expectTrigger: 'pi', expectOutput: '\\pi' },
-            { input: '$Delta', inMath: true, expectTrigger: 'Delta', expectOutput: '\\Delta' },
-            { input: '$rd', inMath: true, expectTrigger: 'rd', expectOutput: '^{}' },
-            { input: '$sr', inMath: true, expectTrigger: 'sr', expectOutput: '^{2}' },
-            { input: '$sq', inMath: true, expectTrigger: 'sq', expectOutput: '\\sqrt{  }' },
-            { input: '$Hhat', inMath: true, expectTrigger: /Hhat/, expectOutput: '\\hat{H}' },
-            { input: '$xbar', inMath: true, expectTrigger: /xbar/, expectOutput: '\\bar{x}' },
-            { input: '$ooo', inMath: true, expectTrigger: 'ooo', expectOutput: '\\infty' },
-            { input: '$RR', inMath: true, expectTrigger: 'RR', expectOutput: '\\mathbb{R}' },
-            { input: 'text without math @a', inMath: false, expectTrigger: null, expectOutput: null },
+            // [input text before cursor, expected output, is math mode]
+            { input: '$@a', inMath: true, expectOutput: '\\alpha' },
+            { input: '$@b', inMath: true, expectOutput: '\\beta' },
+            { input: '$gamma', inMath: true, expectOutput: '\\gamma' },
+            { input: '$pi', inMath: true, expectOutput: '\\pi' },
+            { input: '$Delta', inMath: true, expectOutput: '\\Delta' },
+            { input: '$erd', inMath: true, expectOutput: '^{}', expectMatch: 'rd' }, // Should match 'rd', not 'erd'
+            { input: '$rd', inMath: true, expectOutput: '^{}' },
+            { input: '$sr', inMath: true, expectOutput: '^{2}' },
+            { input: '$sq', inMath: true, expectOutput: '\\sqrt{  }' },
+            { input: '$Hhat', inMath: true, expectOutput: '\\hat{H}' },
+            { input: '$xbar', inMath: true, expectOutput: '\\bar{x}' },
+            { input: '$ooo', inMath: true, expectOutput: '\\infty' },
+            { input: '$RR', inMath: true, expectOutput: '\\mathbb{R}' },
+            { input: '$e^{', inMath: true, expectOutput: null }, // Should NOT match '{' after expansion
+            { input: 'text without math @a', inMath: false, expectOutput: null },
         ];
 
         console.log('=== Snippet Test Results ===');
@@ -1121,31 +1393,20 @@
         for (const tc of testCases) {
             const match = matchSnippet(tc.input, tc.inMath);
 
-            if (tc.expectTrigger === null) {
+            if (tc.expectOutput === null) {
                 // Expect no match
                 if (match === null) {
-                    console.log(`✓ PASS: "${tc.input}" (no math) -> no match`);
+                    console.log(`✓ PASS: "${tc.input}" -> no match (expected)`);
                     passed++;
                 } else {
-                    console.log(`✗ FAIL: "${tc.input}" (no math) -> expected no match, got "${match.snippet.trigger}"`);
+                    console.log(`✗ FAIL: "${tc.input}" -> expected no match, got trigger "${match.snippet.trigger}"`);
                     failed++;
                 }
                 continue;
             }
 
             if (match === null) {
-                console.log(`✗ FAIL: "${tc.input}" -> expected match for "${tc.expectTrigger}", got no match`);
-                failed++;
-                continue;
-            }
-
-            // Check if trigger matches
-            const triggerMatches = tc.expectTrigger instanceof RegExp
-                ? tc.expectTrigger.test(String(match.snippet.trigger))
-                : String(match.snippet.trigger) === tc.expectTrigger;
-
-            if (!triggerMatches) {
-                console.log(`✗ FAIL: "${tc.input}" -> expected trigger "${tc.expectTrigger}", got "${match.snippet.trigger}"`);
+                console.log(`✗ FAIL: "${tc.input}" -> expected output "${tc.expectOutput}", got no match`);
                 failed++;
                 continue;
             }
@@ -1159,17 +1420,46 @@
             }
             const { text } = processReplacement(replacement);
 
+            const triggerInfo = match.snippet.trigger instanceof RegExp
+                ? match.snippet.trigger.source
+                : match.snippet.trigger;
+
             if (text === tc.expectOutput) {
-                console.log(`✓ PASS: "${tc.input}" -> "${text}"`);
+                console.log(`✓ PASS: "${tc.input}" -> "${text}" (trigger: ${triggerInfo})`);
                 passed++;
             } else {
-                console.log(`✗ FAIL: "${tc.input}" -> expected "${tc.expectOutput}", got "${text}"`);
+                console.log(`✗ FAIL: "${tc.input}" -> expected "${tc.expectOutput}", got "${text}" (trigger: ${triggerInfo})`);
                 failed++;
             }
         }
 
         console.log(`\n=== Summary: ${passed} passed, ${failed} failed ===`);
         return { passed, failed };
+    };
+
+    // Debug function to see what would match for a given input
+    window.debugSnippet = function(input, inMath = true) {
+        console.log(`\nDebug: "${input}" (math mode: ${inMath})`);
+        const match = matchSnippet(input, inMath);
+        if (match) {
+            console.log('  Matched trigger:', match.snippet.trigger);
+            console.log('  Match length:', match.matchLength);
+            console.log('  Captures:', match.captures);
+            console.log('  Raw replacement:', match.snippet.replacement);
+
+            let replacement = match.snippet.replacement;
+            if (match.captures && match.captures.length > 0) {
+                for (let i = 0; i < match.captures.length; i++) {
+                    replacement = replacement.replace(new RegExp(`\\[\\[${i}\\]\\]`, 'g'), match.captures[i]);
+                }
+            }
+            const { text, cursorOffset } = processReplacement(replacement);
+            console.log('  Final text:', text);
+            console.log('  Cursor offset:', cursorOffset);
+        } else {
+            console.log('  No match found');
+        }
+        return match;
     };
 
     // Start initialization
