@@ -9,9 +9,35 @@ A userscript that adds [Latex Suite](https://github.com/artisticat1/obsidian-lat
    - **Firefox**: [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/) or [Tampermonkey](https://www.tampermonkey.net/)
    - **Safari**: [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
 
-2. Click [here to install the script](./overleaf-latex-shortcuts.user.js) (or create a new script in Tampermonkey and paste the contents)
+2. Build the script (see [Building from Source](#building-from-source) below) or download a pre-built release
 
-3. Open an Overleaf project and start typing!
+3. Install the built script (`dist/overleaf-latex-shortcuts.user.js`) by opening it in your browser or creating a new script in Tampermonkey and pasting the contents
+
+4. Open an Overleaf project and start typing!
+
+## Building from Source
+
+**Prerequisites:** Node.js (v16 or later)
+
+```bash
+# Clone the repository
+git clone https://github.com/yourusername/overleaf-latex-shortcuts.git
+cd overleaf-latex-shortcuts
+
+# Install dependencies
+npm install
+
+# Build the userscript (output: dist/overleaf-latex-shortcuts.user.js)
+npm run build
+
+# Or watch for changes during development
+npm run watch
+```
+
+**Running Tests:**
+```bash
+npm test
+```
 
 ## Features
 

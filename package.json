@@ -1,0 +1,16 @@
+{
+  "name": "overleaf-latex-shortcuts",
+  "version": "2.0.0",
+  "description": "Latex Suite-style snippet expansion for Overleaf",
+  "type": "module",
+  "scripts": {
+    "build": "node build.js",
+    "watch": "node build.js --watch",
+    "test": "node --test test/*.test.js"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  },
+  "author": "Axel Riley",
+  "license": "MIT"
+}
