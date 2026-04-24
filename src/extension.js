@@ -6,9 +6,9 @@
  */
 
 import { snippets } from './snippets.js';
-import { findMatch, matchFraction } from './matcher.js';
-import { isInMathMode, isDisplayMath } from './mathMode.js';
-import { processReplacement, buildFractionReplacement } from './replacement.js';
+import { findMatch, findVisualMatch, matchFraction } from './matcher.js';
+import { processReplacement, processVisualReplacement, buildFractionReplacement } from './replacement.js';
+import { isInMathMode, isInsideTextCommand } from './mathMode.js';
 import { createTabstopField, getCurrentTabstop, hasActiveTabstops } from './tabstops.js';
 
 /**
@@ -39,6 +39,16 @@ function getTextAfter(state, pos, maxLength = 50) {
 
 // Closing brackets for Tab jumping
 const CLOSING_BRACKETS = [')', ']', '}'];
+
+// Set of known complete LaTeX command names (the part after \) derived from snippet
+// replacements. Used to guard auto-space: only insert a space when the existing
+// \command is a known complete command, not when the user is still typing it.
+const knownCommands = new Set(
+  snippets
+    .map(s => (typeof s.replacement === 'string' ? s.replacement.match(/^\\([a-zA-Z]+)/) : null))
+    .filter(Boolean)
+    .map(m => m[1])
+);
 
 // LaTeX commands whose presence inside brackets means the brackets need \left/\right sizing
 export const TALL_CONTENT_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
@@ -100,21 +110,48 @@ function createInputHandler(tabstopEffects) {
     const textBefore = existingTextBefore + text; // Include the character being typed
     const textAfter = getTextAfter(state, to);
 
-    // Detect math mode
-    const inMathMode = isInMathMode(state, pos, existingTextBefore);
+    // Detect math mode. Downgrade to text when the cursor sits inside a
+    // \text{...}-style group so math snippets don't fire inside prose.
+    const inMathMode = isInMathMode(state, pos, existingTextBefore)
+      && !isInsideTextCommand(existingTextBefore);
+
+    // Visual mode: text is selected — wrap the selection instead of typing.
+    // Fires before all other handlers so it always takes priority.
+    if (to > from && text.length === 1) {
+      const visualSnippet = findVisualMatch(text, snippets, inMathMode);
+      if (visualSnippet) {
+        const selectedText = state.doc.sliceString(from, to);
+        const processed = processVisualReplacement(visualSnippet.replacement, selectedText, from);
+        if (processed) {
+          const { text: replacementText, cursorPos, tabstops } = processed;
+          const effects = [];
+          if (tabstops && tabstops.length > 0 && tabstopEffects) {
+            effects.push(tabstopEffects.setEffect.of(tabstops));
+          }
+          view.dispatch({
+            changes: { from, to, insert: replacementText },
+            selection: { anchor: cursorPos },
+            effects
+          });
+          return true;
+        }
+      }
+    }
 
     // Auto-space after bare LaTeX commands in math mode.
     // \beta followed immediately by a letter would become \betagamma (one unknown
     // command). Insert a space so the next character starts fresh.
     // Only triggers when: in math mode, typing a single letter, and the text
     // immediately before the cursor ends with \command (backslash + letters, no {).
-    if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text) &&
-      /\\[a-zA-Z]+$/.test(existingTextBefore)) {
-      view.dispatch({
-        changes: { from, to, insert: ' ' + text },
-        selection: { anchor: from + 2 }
-      });
-      return true;
+    if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text)) {
+      const cmdMatch = existingTextBefore.match(/\\([a-zA-Z]+)$/);
+      if (cmdMatch && knownCommands.has(cmdMatch[1])) {
+        view.dispatch({
+          changes: { from, to, insert: ' ' + text },
+          selection: { anchor: from + 2 }
+        });
+        return true;
+      }
     }
 
     // Auto-size brackets: when ) or ] is typed in math mode, scan back for the
@@ -479,10 +516,10 @@ export function createSnippetExtensions(CM) {
 
   const tabstopEffects = { setEffect, clearEffect, advanceEffect };
 
-  // Create input handler
-  const inputHandler = EditorView.inputHandler.of(
-    createInputHandler(tabstopEffects)
-  );
+  // Create input handler — wrapped in Prec.highest so it runs before Overleaf's
+  // own inputHandler (which otherwise intercepts (, [, { before we can).
+  const rawInputHandler = EditorView.inputHandler.of(createInputHandler(tabstopEffects));
+  const inputHandler = Prec?.highest ? Prec.highest(rawInputHandler) : rawInputHandler;
 
   // Create keymap for Tab and Escape
   // Use high precedence if available so Tab works for bracket jumping

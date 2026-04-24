@@ -57,17 +57,17 @@ describe('processTabstops', () => {
 
 
 describe('buildFractionReplacement', () => {
-  it('should place cursor inside the denominator braces', () => {
-    const result = buildFractionReplacement({ numerator: 'x', denominator: 'y' }, 0);
-    assert.strictEqual(result.text, '\\frac{x}{y}');
-    // Cursor inside denominator: \frac{x}{y} is 11 chars, cursor at 10 (before closing })
-    assert.strictEqual(result.cursorPos, 10);
+  it('should produce empty denominator with cursor inside', () => {
+    const result = buildFractionReplacement({ numerator: 'x' }, 0);
+    assert.strictEqual(result.text, '\\frac{x}{}');
+    // \frac{x}{} is 10 chars, cursor before closing } at position 9
+    assert.strictEqual(result.cursorPos, 9);
   });
 
-  it('should handle longer numerator/denominator', () => {
-    const result = buildFractionReplacement({ numerator: 'abc', denominator: 'def' }, 5);
-    assert.strictEqual(result.text, '\\frac{abc}{def}');
-    // \frac{abc}{def} is 15 chars, cursor inside denominator at 5 + 14 = 19
-    assert.strictEqual(result.cursorPos, 19);
+  it('should handle longer numerator', () => {
+    const result = buildFractionReplacement({ numerator: 'abc' }, 5);
+    assert.strictEqual(result.text, '\\frac{abc}{}');
+    // \frac{abc}{} is 12 chars, cursor at 5 + 12 - 1 = 16
+    assert.strictEqual(result.cursorPos, 16);
   });
 });

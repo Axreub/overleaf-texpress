@@ -41,15 +41,15 @@ const GREEK_LETTERS_NORMAL = [
 
 export const FRAC_PREFIX_OPS = new Set([
   'arcsin', 'sin', 'arccos', 'cos', 'arctan', 'tan', 'csc', 'sec', 'cot',
-  'sinh', 'cosh', 'tanh', 'coth', 'partial', 'left', 'log', 'ln', 'exp','hat', 'bar', 'tilde', 
-  'vec', 'dot', 'ddot', 'mathcal', 'mathscr', 'mathbf', 'boldsymbol', 
+  'sinh', 'cosh', 'tanh', 'coth', 'partial', 'left', 'log', 'ln', 'exp', 'hat', 'bar', 'tilde',
+  'vec', 'dot', 'ddot', 'mathcal', 'mathscr', 'mathbf', 'boldsymbol',
 ]);
-  GREEK_LETTERS_HIGH_PRIORITY.forEach(letter => {
-    FRAC_PREFIX_OPS.add(letter);
-  });
-  GREEK_LETTERS_NORMAL.forEach(letter => {
-    FRAC_PREFIX_OPS.add(letter);
-  });
+GREEK_LETTERS_HIGH_PRIORITY.forEach(letter => {
+  FRAC_PREFIX_OPS.add(letter);
+});
+GREEK_LETTERS_NORMAL.forEach(letter => {
+  FRAC_PREFIX_OPS.add(letter);
+});
 
 // Generate Greek letter snippets programmatically
 // High priority letters (contain other Greek letters as suffixes)
@@ -63,7 +63,7 @@ const greekSnippetsHighPriority = GREEK_LETTERS_HIGH_PRIORITY.map(letter => ({
 const greekSnippetsNormal = GREEK_LETTERS_NORMAL.map(letter => ({
   trigger: letter,
   replacement: '\\' + letter,
-  options: { mode: "math", auto: true, priority: -2}
+  options: { mode: "math", auto: true, priority: -2 }
 }));
 
 const greekSnippets = [...greekSnippetsHighPriority, ...greekSnippetsNormal];
@@ -137,7 +137,7 @@ const rawSnippets = [
   { trigger: /([A-Za-z])(\d)/, replacement: "[[0]]_{[[1]]}", options: { mode: "math", auto: true, priority: -1 } },
 
   // Functions with backslash
-  { trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]", options: { mode: "math", auto: true } },
+  { trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]($0)", options: { mode: "math", auto: true } },
 
   { trigger: "conj", replacement: "^{*}", options: { mode: "math", auto: true } },
   { trigger: "Re", replacement: "\\mathrm{Re}", options: { mode: "math", auto: true } },
@@ -212,13 +212,13 @@ const rawSnippets = [
   { trigger: "Cov", replacement: "\\operatorname{Cov}", options: { mode: "math", auto: true } },
   { trigger: "+-", replacement: "\\pm", options: { mode: "math", auto: true } },
   { trigger: "-+", replacement: "\\mp", options: { mode: "math", auto: true } },
-  { trigger: "...", replacement: "\\dots", options: { mode: "math", auto: true } },
+  { trigger: "...", replacement: "\\dots $0", options: { mode: "math", auto: true } },
   { trigger: ["nabl", "del"], replacement: "\\nabla", options: { mode: "math", auto: true } },
-  { trigger: ["xx", "times"], replacement: "\\times", options: { mode: "math", auto: true } },
-  { trigger: ["**", "cdot"], replacement: "\\cdot", options: { mode: "math", auto: true } },
-  { trigger: ["otimes", "ox"], replacement: "\\otimes", options: { mode: "math", auto: true } },
-  { trigger: ["oplus", "o+"], replacement: "\\oplus", options: { mode: "math", auto: true } },
-  { trigger: "para", replacement: "\\parallel", options: { mode: "math", auto: true } },
+  { trigger: ["xx", "times"], replacement: "\\times $0", options: { mode: "math", auto: true } },
+  { trigger: ["**", "cdot"], replacement: "\\cdot $0", options: { mode: "math", auto: true } },
+  { trigger: ["otimes", "ox"], replacement: "\\otimes $0", options: { mode: "math", auto: true } },
+  { trigger: ["oplus", "o+"], replacement: "\\oplus $0", options: { mode: "math", auto: true } },
+  { trigger: "para", replacement: "\\parallel $0", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Relations
@@ -304,7 +304,6 @@ const rawSnippets = [
   {
     trigger: /\\(arcsin|sin|arccos|cos|arctan|tan|csc|sec|cot)([A-Za-gi-z])/,
     replacement: "\\[[0]] [[1]]",
-    options: { mode: "math", auto: true }
   },
   {
     trigger: /\\(sinh|cosh|tanh|coth)([A-Za-z])/,
@@ -351,6 +350,33 @@ const rawSnippets = [
 
   { trigger: "cases", replacement: "\\begin{cases}\n$0\n\\end{cases}", options: { mode: "math", auto: true } },
   { trigger: "array", replacement: "\\begin{array}\n$0\n\\end{array}", options: { mode: "math", auto: true } },
+
+  // ----------------------------------------
+  // Visual Mode (select text, then press trigger key)
+  // [[VISUAL]] in string replacements is substituted with the selected text.
+  // Function replacements receive ([selectedText]) and return a string template.
+  // ----------------------------------------
+
+  // Detects tall symbols that need \left/\right sizing (same set as extension.js)
+  // defined here to avoid a circular import with extension.js
+  ...(() => {
+    const TALL_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
+    const tall = (v) => TALL_RE.test(v);
+    return [
+      { trigger: "/", replacement: "\\frac{[[VISUAL]]}{$0}$1", options: { mode: "math", visual: true } },
+      { trigger: "(", replacement: ([v]) => tall(v) ? `\\left(${v}\\right)$0`   : `(${v})$0`,       options: { mode: "math", visual: true } },
+      { trigger: "[", replacement: ([v]) => tall(v) ? `\\left[${v}\\right]$0`   : `[${v}]$0`,       options: { mode: "math", visual: true } },
+      { trigger: "{", replacement: ([v]) => tall(v) ? `\\left\\{${v}\\right\\}$0` : `\\{${v}\\}$0`, options: { mode: "math", visual: true } },
+      { trigger: "|", replacement: ([v]) => tall(v) ? `\\left|${v}\\right|$0`   : `|${v}|$0`,       options: { mode: "math", visual: true } },
+    ];
+  })(),
+
+  { trigger: "U", replacement: "\\underbrace{ [[VISUAL]] }_{ $0 }", options: { mode: "math", visual: true } },
+  { trigger: "O", replacement: "\\overbrace{ [[VISUAL]] }^{ $0 }",  options: { mode: "math", visual: true } },
+  { trigger: "B", replacement: "\\underset{ $0 }{ [[VISUAL]] }",    options: { mode: "math", visual: true } },
+  { trigger: "C", replacement: "\\cancel{ [[VISUAL]] }",            options: { mode: "math", visual: true } },
+  { trigger: "K", replacement: "\\cancelto{ $0 }{ [[VISUAL]] }",    options: { mode: "math", visual: true } },
+  { trigger: "S", replacement: "\\sqrt{ [[VISUAL]] }",              options: { mode: "math", visual: true } },
 
   // ----------------------------------------
   // Brackets
