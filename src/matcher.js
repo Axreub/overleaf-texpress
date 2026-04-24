@@ -169,13 +169,9 @@ export function findMatch(textBefore, snippets, inMathMode, textAfter = '') {
 }
 
 /**
- * Match fraction patterns like x/y, (a+b)/c, \pi/2, \hat{H}/\hbar.
- *
- * Uses a single backward-scanning pass:
- *   1. Find the '/' that must be the last or second-to-last character.
- *   2. Scan backward from '/' to classify the numerator token.
- *   3. Scan forward from '/' to classify the denominator token.
- *
+ * Match an instant fraction trigger: "<token>/" at end of textBefore.
+ * Returns the numerator token; the denominator is left empty for the
+ * caller to place the cursor inside.
  * A token is one of (in order of precedence):
  *   - A parenthesised group: (...) with no nested parens
  *   - A LaTeX command with a single braced argument: \cmd{...}
@@ -190,35 +186,34 @@ export function findMatch(textBefore, snippets, inMathMode, textAfter = '') {
  *   character must be the last character of textBefore)
  * @returns {Object|null} - { matchLength, numerator, denominator } or null
  */
+
 export function matchFraction(textBefore) {
   const s = textBefore;
   const len = s.length;
-  if (len < 3) return null;
+  if (len < 2) return null;
 
-  // Scan the denominator (right of '/')
-  const { token: denominator, consumed: denomConsumed } = scanTokenRight(s, len - 1);
-  if (!denominator) return null;
+  // Trigger fires the instant '/' is typed at the end of input
+  if (s[len - 1] !== '/') return null;
 
-  // The '/' must be immediately before the denominator
-  const slashPos = len - 1 - denomConsumed;
-  if (slashPos < 0 || s[slashPos] !== '/') return null;
-
-  // Scan the numerator (left of '/')
-  const { token: numerator, consumed: numConsumed, singleChar } = scanTokenLeft(s, slashPos - 1);
+  // Scan the numerator ending just before the slash
+  const { token: numerator, consumed, singleChar } = scanTokenLeft(s, len - 2);
   if (!numerator) return null;
 
-  // For single-char numerators, reject if preceded by a letter or backslash
-  // (avoids matching "alpha/b" as "a/b" when the 'a' is part of "alpha")
+  // Reject single-char numerators preceded by a letter/backslash
+  // (so "alpha/" isn't read as "a/")
   if (singleChar) {
-    const charBeforeNum = s[slashPos - 1 - 1]; // one before the single char
+    const charBeforeNum = s[len - 3];
     if (charBeforeNum && /[a-zA-Z\\]/.test(charBeforeNum)) {
       return null;
     }
   }
 
-  const matchLength = numConsumed + 1 /* slash */ + denomConsumed;
-  return { matchLength, numerator, denominator };
+  return {
+    matchLength: consumed + 1, // numerator + '/'
+    numerator,
+  };
 }
+
 
 /**
  * Scan backward from position `pos` (inclusive) in string `s` to extract
@@ -226,6 +221,39 @@ export function matchFraction(textBefore) {
  * `consumed` is the number of characters that belong to the token.
  */
 function scanTokenLeft(s, pos) {
+  const atom = scanAtom(s, pos);
+  if (!atom.token) return null;
+
+  // Extend leftward through chained ^/_ scripts
+  let consumed = atom.consumed;
+  while (true) {
+    const markerPos = pos - consumed;
+    if (markerPos < 0) break;
+    if (s[markerPos] !== '^' && s[markerPos] !== '_') break;
+
+    const base = scanAtom(s, markerPos - 1);
+    if (!base.token) break;
+    consumed += 1 + base.consumed;
+  }
+  const sliceStart = pos - consumed + 1;
+  const beforeToken = s.slice(0, sliceStart);
+  const partialMatch = beforeToken.match(/(\\partial)\s+$/);
+  if (partialMatch) {
+    consumed += partialMatch[0].length;
+    
+  if (consumed > atom.consumed) {
+    return { token: s.slice(pos - consumed + 1, pos + 1), consumed, singleChar: false };
+  }
+  return atom;
+}
+
+
+/**
+ * Scan backward from position `pos` (inclusive) in string `s` to extract
+ * a fraction token. Returns { token, consumed, singleChar }.
+ * `consumed` is the number of characters that belong to the token.
+ */
+function scanAtom(s, pos) {
   if (pos < 0) return { token: null, consumed: 0, singleChar: false };
 
   // Parenthesised group: (...) — no nested parens allowed
@@ -254,8 +282,10 @@ function scanTokenLeft(s, pos) {
           return { token: `${cmd}{${arg}}`, consumed, singleChar: false };
         }
       }
+      // fallback to non-command braces
+      return { token: '{${arg}}', consumed: pos - openBrace + 1, singleChar: false };
     }
-    return { token: null, consumed: 0, singleChar: false };
+    return { token: '}', consumed: 1, singleChar: true };
   }
 
   // Plain LaTeX command: \cmd
@@ -277,71 +307,6 @@ function scanTokenLeft(s, pos) {
   }
 
   return { token: null, consumed: 0, singleChar: false };
-}
-
-/**
- * Scan forward from position `pos` (inclusive, which must be the first char
- * after the '/') in string `s` to extract a fraction token.
- * Returns { token, consumed }.
- */
-function scanTokenRight(s, endPos) {
-  // endPos is the index of the last char we have (end of textBefore).
-  // We scan rightward from after the slash — but since we only have textBefore
-  // we read from endPos backward to find the slash, then the denominator is
-  // whatever follows the slash up to endPos.
-  //
-  // Reframe: the denominator ends at s[endPos]. Walk backward from endPos.
-  const pos = endPos;
-  if (pos < 0) return { token: null, consumed: 0 };
-
-  // Parenthesised group ending at pos
-  if (s[pos] === ')') {
-    const openPos = s.lastIndexOf('(', pos - 1);
-    if (openPos >= 0 && !s.slice(openPos + 1, pos).includes('(') && !s.slice(openPos + 1, pos).includes(')')) {
-      const inner = s.slice(openPos + 1, pos);
-      return { token: inner, consumed: pos - openPos + 1 };
-    }
-    return { token: null, consumed: 0 };
-  }
-
-  // LaTeX command with braced arg ending at pos (pos === '}')
-  if (s[pos] === '}') {
-    const openBrace = s.lastIndexOf('{', pos - 1);
-    if (openBrace >= 0) {
-      const arg = s.slice(openBrace + 1, pos);
-      let cmdEnd = openBrace - 1;
-      if (cmdEnd >= 0 && /[a-zA-Z]/.test(s[cmdEnd])) {
-        let cmdStart = cmdEnd;
-        while (cmdStart > 0 && /[a-zA-Z]/.test(s[cmdStart - 1])) cmdStart--;
-        if (cmdStart > 0 && s[cmdStart - 1] === '\\') {
-          const cmd = s.slice(cmdStart - 1, openBrace);
-          const consumed = pos - (cmdStart - 1) + 1;
-          return { token: `${cmd}{${arg}}`, consumed };
-        }
-      }
-    }
-    return { token: null, consumed: 0 };
-  }
-
-  // Plain LaTeX command ending at pos
-  if (/[a-zA-Z]/.test(s[pos])) {
-    let end = pos;
-    let start = end;
-    while (start > 0 && /[a-zA-Z]/.test(s[start - 1])) start--;
-    if (start > 0 && s[start - 1] === '\\') {
-      const cmd = s.slice(start - 1, end + 1);
-      return { token: cmd, consumed: end - start + 2 };
-    }
-    // Single letter
-    return { token: s[pos], consumed: 1 };
-  }
-
-  // Single digit
-  if (/[0-9]/.test(s[pos])) {
-    return { token: s[pos], consumed: 1 };
-  }
-
-  return { token: null, consumed: 0 };
 }
 
 export default findMatch;
