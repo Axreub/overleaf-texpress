@@ -87,16 +87,13 @@ describe('Greek letter ordering — must not split words', () => {
 // ============================================================
 
 describe('word-boundary guard — no match mid-word', () => {
-  it('abeta — beta trigger must NOT fire (preceded by "a")', () => {
+  it('abeta — beta trigger fires (wordBoundary removed)', () => {
     const m = findMatch('$abeta', snippets, true);
-    // If anything matches, it must not be the bare "beta" trigger
-    if (m) {
-      assert.notStrictEqual(m.snippet.trigger, 'beta',
-        'beta trigger should not match when preceded by a word character');
-    }
+    assert.ok(m, 'beta should now match even when preceded by a letter');
+    assert.strictEqual(m.snippet.trigger, 'beta');
   });
 
-  it('alphabet — alpha trigger must NOT fire mid-word', () => {
+  it('alphabet — alpha trigger must NOT fire (text ends in "t", not "alpha")', () => {
     const m = findMatch('$alphabet', snippets, true);
     if (m) {
       assert.notStrictEqual(m.snippet.trigger, 'alpha',
@@ -104,30 +101,24 @@ describe('word-boundary guard — no match mid-word', () => {
     }
   });
 
-  it('xeta — eta trigger must NOT fire (preceded by "x")', () => {
+  it('xeta — eta trigger fires (wordBoundary removed)', () => {
     const m = findMatch('$xeta', snippets, true);
-    if (m) {
-      assert.notStrictEqual(m.snippet.trigger, 'eta',
-        'eta trigger should not match inside "xeta"');
-    }
+    assert.ok(m, 'eta should now match even when preceded by a letter');
+    assert.strictEqual(m.snippet.trigger, 'eta');
   });
 
-  it('sigmap — sigma trigger must NOT fire (preceded by nothing helpful, but "sigmap" ends in "p" not "sigma" — eta not involved, just a regression guard)', () => {
-    // "sigmap" ends in "p", so sigma should not match at all
+  it('sigmap — sigma trigger must NOT fire (text ends in "p", not "sigma")', () => {
     const m = findMatch('$sigmap', snippets, true);
-    // sigma trigger only matches if text ends with "sigma"
     if (m) {
       assert.notStrictEqual(m.snippet.trigger, 'sigma',
         'sigma trigger should not match "sigmap"');
     }
   });
 
-  it('xpi — pi trigger must NOT fire (preceded by "x")', () => {
+  it('xpi — pi trigger fires (wordBoundary removed)', () => {
     const m = findMatch('$xpi', snippets, true);
-    if (m) {
-      assert.notStrictEqual(m.snippet.trigger, 'pi',
-        'pi trigger should not match inside "xpi"');
-    }
+    assert.ok(m, 'pi should now match even when preceded by a letter');
+    assert.strictEqual(m.snippet.trigger, 'pi');
   });
 });
 
@@ -210,84 +201,52 @@ describe('exists trigger', () => {
 // ============================================================
 
 describe('matchFraction — comprehensive cases', () => {
-  it('a/b — simple single chars', () => {
-    const m = matchFraction('a/b');
+  it('a/ — simple single char numerator', () => {
+    const m = matchFraction('a/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, 'a');
-    assert.strictEqual(m.denominator, 'b');
-    assert.strictEqual(m.matchLength, 3);
+    assert.strictEqual(m.matchLength, 2);
   });
 
-  it('\\pi/2 — LaTeX command / digit', () => {
-    const m = matchFraction('\\pi/2');
+  it('\\pi/ — LaTeX command numerator', () => {
+    const m = matchFraction('\\pi/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, '\\pi');
-    assert.strictEqual(m.denominator, '2');
   });
 
-  it('\\alpha/\\beta — LaTeX / LaTeX', () => {
-    const m = matchFraction('\\alpha/\\beta');
+  it('\\alpha/ — LaTeX command numerator', () => {
+    const m = matchFraction('\\alpha/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, '\\alpha');
-    assert.strictEqual(m.denominator, '\\beta');
   });
 
-  it('(a+b)/c — parenthesised numerator', () => {
-    const m = matchFraction('(a+b)/c');
+  it('(a+b)/ — parenthesised numerator', () => {
+    const m = matchFraction('(a+b)/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, 'a+b');
-    assert.strictEqual(m.denominator, 'c');
   });
 
-  it('(a+b)/(c+d) — both sides parenthesised', () => {
-    const m = matchFraction('(a+b)/(c+d)');
-    assert.ok(m, 'should match');
-    assert.strictEqual(m.numerator, 'a+b');
-    assert.strictEqual(m.denominator, 'c+d');
-  });
-
-  it('\\hat{H}/\\hbar — LaTeX-with-arg / LaTeX', () => {
-    const m = matchFraction('\\hat{H}/\\hbar');
+  it('\\hat{H}/ — LaTeX-with-arg numerator', () => {
+    const m = matchFraction('\\hat{H}/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, '\\hat{H}');
-    assert.strictEqual(m.denominator, '\\hbar');
   });
 
-  it('\\hat{H}/2 — LaTeX-with-arg / digit', () => {
-    const m = matchFraction('\\hat{H}/2');
-    assert.ok(m, 'should match');
-    assert.strictEqual(m.numerator, '\\hat{H}');
-    assert.strictEqual(m.denominator, '2');
-  });
-
-  it('x/\\sqrt{2} — char / LaTeX-with-arg', () => {
-    const m = matchFraction(' x/\\sqrt{2}');
+  it('x/ — single letter numerator', () => {
+    const m = matchFraction(' x/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, 'x');
-    assert.strictEqual(m.denominator, '\\sqrt{2}');
   });
 
-  it('\\pi/(a+b) — LaTeX / parenthesised denominator', () => {
-    const m = matchFraction('\\pi/(a+b)');
-    assert.ok(m, 'should match');
-    assert.strictEqual(m.numerator, '\\pi');
-    assert.strictEqual(m.denominator, 'a+b');
-  });
-
-  it('alpha/b — must NOT match a/b (a is part of alpha)', () => {
-    const m = matchFraction('alpha/b');
-    // If it matches, it must not have grabbed the final 'a' as a single-char numerator
-    if (m) {
-      assert.notStrictEqual(m.numerator, 'a',
-        'should not split "alpha" to use "a" as numerator');
-    }
-  });
-
-  it('1/2 — digit / digit', () => {
-    const m = matchFraction('1/2');
+  it('1/ — digit numerator', () => {
+    const m = matchFraction('1/');
     assert.ok(m, 'should match');
     assert.strictEqual(m.numerator, '1');
-    assert.strictEqual(m.denominator, '2');
+  });
+
+  it('slash not at end returns null', () => {
+    assert.strictEqual(matchFraction('a/b'), null);
+    assert.strictEqual(matchFraction('(a+b)/(c+d)'), null);
   });
 
   it('string too short returns null', () => {

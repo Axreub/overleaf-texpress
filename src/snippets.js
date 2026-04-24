@@ -352,6 +352,33 @@ const rawSnippets = [
   { trigger: "array", replacement: "\\begin{array}\n$0\n\\end{array}", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
+  // Visual Mode (select text, then press trigger key)
+  // [[VISUAL]] in string replacements is substituted with the selected text.
+  // Function replacements receive ([selectedText]) and return a string template.
+  // ----------------------------------------
+
+  // Detects tall symbols that need \left/\right sizing (same set as extension.js)
+  // defined here to avoid a circular import with extension.js
+  ...(() => {
+    const TALL_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
+    const tall = (v) => TALL_RE.test(v);
+    return [
+      { trigger: "/", replacement: "\\frac{[[VISUAL]]}{$0}$1", options: { mode: "math", visual: true } },
+      { trigger: "(", replacement: ([v]) => tall(v) ? `\\left(${v}\\right)$0`   : `(${v})$0`,       options: { mode: "math", visual: true } },
+      { trigger: "[", replacement: ([v]) => tall(v) ? `\\left[${v}\\right]$0`   : `[${v}]$0`,       options: { mode: "math", visual: true } },
+      { trigger: "{", replacement: ([v]) => tall(v) ? `\\left\\{${v}\\right\\}$0` : `\\{${v}\\}$0`, options: { mode: "math", visual: true } },
+      { trigger: "|", replacement: ([v]) => tall(v) ? `\\left|${v}\\right|$0`   : `|${v}|$0`,       options: { mode: "math", visual: true } },
+    ];
+  })(),
+
+  { trigger: "U", replacement: "\\underbrace{ [[VISUAL]] }_{ $0 }", options: { mode: "math", visual: true } },
+  { trigger: "O", replacement: "\\overbrace{ [[VISUAL]] }^{ $0 }",  options: { mode: "math", visual: true } },
+  { trigger: "B", replacement: "\\underset{ $0 }{ [[VISUAL]] }",    options: { mode: "math", visual: true } },
+  { trigger: "C", replacement: "\\cancel{ [[VISUAL]] }",            options: { mode: "math", visual: true } },
+  { trigger: "K", replacement: "\\cancelto{ $0 }{ [[VISUAL]] }",    options: { mode: "math", visual: true } },
+  { trigger: "S", replacement: "\\sqrt{ [[VISUAL]] }",              options: { mode: "math", visual: true } },
+
+  // ----------------------------------------
   // Brackets
   // ----------------------------------------
 
