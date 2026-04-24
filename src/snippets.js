@@ -47,14 +47,14 @@ export const snippets = [
   // ----------------------------------------
   // Math/Text Mode Entry
   // ----------------------------------------
-  { trigger: "mk", replacement: "$$0$", options: { mode: "text", auto: true } },
-  { trigger: "dm", replacement: "$$\n$0\n$$", options: { mode: "text", auto: true, wordBoundary: true } },
+  { trigger: "mk", replacement: "$$0$ $1", options: { mode: "text", auto: true } },
+  { trigger: "dm", replacement: "$$\n$0\n$$ $1", options: { mode: "text", auto: true, wordBoundary: true } },
   // beg: cursor starts in body ($0), Tab navigates to env name inside \begin{}
   // Both \begin and \end show "env" placeholder — second occurrence is static (not a linked tabstop)
   { trigger: "beg", replacement: "\\begin{${1:env}}\n$0\n\\end{${1:env}}", options: { mode: "text", auto: true } },
   // Text-mode display math environments — reach for these like you'd reach for dm
   { trigger: "ali", replacement: "\\begin{align*}\n$0\n\\end{align*}", options: { mode: "text", auto: true } },
-  { trigger: "eq",  replacement: "\\begin{equation}\n$0\n\\end{equation}", options: { mode: "text", auto: true } },
+  { trigger: "eq", replacement: "\\begin{equation}\n$0\n\\end{equation}", options: { mode: "text", auto: true } },
 
   // ----------------------------------------
   // Greek Letters (@ shortcuts)
@@ -106,17 +106,17 @@ export const snippets = [
   { trigger: "//", replacement: "\\frac{$0}{$1}$2", options: { mode: "math", auto: true } },
   { trigger: "ee", replacement: "e^{ $0 }$1", options: { mode: "math", auto: true } },
   { trigger: "invs", replacement: "^{-1}", options: { mode: "math", auto: true } },
-  
+
   // Auto letter subscript: x2 -> x_{2}
-  { 
-    trigger: /([A-Za-z])(\d)/, 
-    replacement: "[[0]]_{[[1]]}", 
+  {
+    trigger: /([A-Za-z])(\d)/,
+    replacement: "[[0]]_{[[1]]}",
     options: { mode: "math", auto: true, priority: -1 }
   },
 
   // Functions with backslash
   { trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]", options: { mode: "math", auto: true } },
-  
+
   { trigger: "conj", replacement: "^{*}", options: { mode: "math", auto: true } },
   { trigger: "Re", replacement: "\\mathrm{Re}", options: { mode: "math", auto: true } },
   { trigger: "Im", replacement: "\\mathrm{Im}", options: { mode: "math", auto: true } },
@@ -142,7 +142,7 @@ export const snippets = [
   { trigger: /([a-zA-Z])tilde/, replacement: "\\tilde{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
   { trigger: /([a-zA-Z])und/, replacement: "\\underline{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
   { trigger: /([a-zA-Z])vec/, replacement: "\\vec{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  
+
   // Bold shortcuts: x,. or x., -> \mathbf{x}
   { trigger: /([a-zA-Z]),\./, replacement: "\\mathbf{[[0]]}", options: { mode: "math", auto: true } },
   { trigger: /([a-zA-Z])\.,/, replacement: "\\mathbf{[[0]]}", options: { mode: "math", auto: true } },
@@ -268,19 +268,19 @@ export const snippets = [
   // ----------------------------------------
   // Trigonometry
   // ----------------------------------------
-  { 
-    trigger: /([^\\])(arcsin|sin|arccos|cos|arctan|tan|csc|sec|cot)/, 
-    replacement: "[[0]]\\[[1]]", 
+  {
+    trigger: /([^\\])(arcsin|sin|arccos|cos|arctan|tan|csc|sec|cot)/,
+    replacement: "[[0]]\\[[1]]",
     options: { mode: "math", auto: true }
   },
-  { 
-    trigger: /\\(arcsin|sin|arccos|cos|arctan|tan|csc|sec|cot)([A-Za-gi-z])/, 
-    replacement: "\\[[0]] [[1]]", 
+  {
+    trigger: /\\(arcsin|sin|arccos|cos|arctan|tan|csc|sec|cot)([A-Za-gi-z])/,
+    replacement: "\\[[0]] [[1]]",
     options: { mode: "math", auto: true }
   },
-  { 
-    trigger: /\\(sinh|cosh|tanh|coth)([A-Za-z])/, 
-    replacement: "\\[[0]] [[1]]", 
+  {
+    trigger: /\\(sinh|cosh|tanh|coth)([A-Za-z])/,
+    replacement: "\\[[0]] [[1]]",
     options: { mode: "math", auto: true }
   },
 
@@ -351,17 +351,17 @@ export const snippets = [
   // ----------------------------------------
   // Taylor Expansion
   // ----------------------------------------
-  { 
-    trigger: "tayl", 
-    replacement: "${0:f}(${1:x} + ${2:h}) = ${0:f}(${1:x}) + ${0:f}'(${1:x})${2:h} + ${0:f}''(${1:x}) \\frac{${2:h}^{2}}{2!} + \\dots$3", 
+  {
+    trigger: "tayl",
+    replacement: "${0:f}(${1:x} + ${2:h}) = ${0:f}(${1:x}) + ${0:f}'(${1:x})${2:h} + ${0:f}''(${1:x}) \\frac{${2:h}^{2}}{2!} + \\dots$3",
     options: { mode: "math", auto: true }
   },
 
   // ----------------------------------------
   // Identity Matrix (function replacement)
   // ----------------------------------------
-  { 
-    trigger: /iden(\d)/, 
+  {
+    trigger: /iden(\d)/,
     replacement: (match) => {
       const n = parseInt(match[1], 10);
       let arr = [];
@@ -373,7 +373,7 @@ export const snippets = [
       }
       let output = arr.map(el => el.join(" & ")).join(" \\\\\n");
       return `\\begin{pmatrix}\n${output}\n\\end{pmatrix}`;
-    }, 
+    },
     options: { mode: "math", auto: true }
   },
 

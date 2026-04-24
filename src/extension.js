@@ -273,9 +273,17 @@ function createTabCommand(tabstopField, tabstopEffects) {
     // This lets Tab navigate through nested LaTeX structures without needing
     // snippet-inserted tabstops.
     const pos = state.selection.main.head;
-    const lineEnd = state.doc.lineAt(pos).to;
+    const line = state.doc.lineAt(pos);
+
+    // At or before the first non-whitespace character, the user wants to indent.
+    const lineText = state.doc.sliceString(line.from, line.to);
+    const firstNonSpace = lineText.search(/\S/);
+    const contentStart = firstNonSpace === -1 ? line.to : line.from + firstNonSpace;
+    if (pos <= contentStart) return false;
+
+    const lineEnd = line.to;
     const restOfLine = state.doc.sliceString(pos, lineEnd);
-    const nextBracket = restOfLine.search(/[}\)\]]/);
+    const nextBracket = restOfLine.search(/[}\)\]$]/);
     if (nextBracket !== -1) {
       view.dispatch({ selection: { anchor: pos + nextBracket + 1 } });
       return true;
@@ -293,7 +301,15 @@ function createShiftTabCommand() {
   return (view) => {
     const state = view.state;
     const pos = state.selection.main.head;
-    const lineStart = state.doc.lineAt(pos).from;
+    const line = state.doc.lineAt(pos);
+    const lineStart = line.from;
+
+    // At or before the first non-whitespace character, let CM6 de-indent normally.
+    const lineText = state.doc.sliceString(lineStart, line.to);
+    const firstNonSpace = lineText.search(/\S/);
+    const contentStart = firstNonSpace === -1 ? line.to : lineStart + firstNonSpace;
+    if (pos <= contentStart) return false;
+
     const beforeCursor = state.doc.sliceString(lineStart, pos);
 
     // Walk backward to find the last closing bracket before the cursor.
@@ -305,9 +321,14 @@ function createShiftTabCommand() {
         view.dispatch({ selection: { anchor: lineStart + i + 1 } });
         return true;
       }
+      if (ch === '$') {
+        // Jump to BEFORE the $ to exit math mode on the left
+        view.dispatch({ selection: { anchor: lineStart + i } });
+        return true;
+      }
     }
 
-    return false; // No bracket found, let default Shift-Tab happen
+    return true; // No bracket found but cursor is mid-sentence — consume to avoid de-indent
   };
 }
 
