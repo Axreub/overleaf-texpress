@@ -122,43 +122,34 @@ describe('TALL_CONTENT_RE', () => {
 });
 
 describe('matchFraction', () => {
-  it('should match simple fractions like a/b', () => {
-    const match = matchFraction('a/b');
-    assert.ok(match, 'Should match a/b');
+  it('should match simple fractions like a/', () => {
+    const match = matchFraction('a/');
+    assert.ok(match, 'Should match a/');
     assert.strictEqual(match.numerator, 'a');
-    assert.strictEqual(match.denominator, 'b');
-    assert.strictEqual(match.matchLength, 3);
+    assert.strictEqual(match.matchLength, 2);
   });
-  
-  it('should match LaTeX command fractions like \\pi/2', () => {
-    const match = matchFraction('\\pi/2');
-    assert.ok(match, 'Should match \\pi/2');
+
+  it('should match LaTeX command fractions like \\pi/', () => {
+    const match = matchFraction('\\pi/');
+    assert.ok(match, 'Should match \\pi/');
     assert.strictEqual(match.numerator, '\\pi');
-    assert.strictEqual(match.denominator, '2');
   });
-  
-  it('should match fractions with LaTeX on both sides', () => {
-    const match = matchFraction('\\alpha/\\beta');
+
+  it('should match fractions with LaTeX numerator like \\alpha/', () => {
+    const match = matchFraction('\\alpha/');
     assert.ok(match, 'Should match');
     assert.strictEqual(match.numerator, '\\alpha');
-    assert.strictEqual(match.denominator, '\\beta');
   });
-  
+
   it('should match parenthesized numerator', () => {
-    const match = matchFraction('(a+b)/c');
-    assert.ok(match, 'Should match (a+b)/c');
+    const match = matchFraction('(a+b)/');
+    assert.ok(match, 'Should match (a+b)/');
     assert.strictEqual(match.numerator, 'a+b');
-    assert.strictEqual(match.denominator, 'c');
   });
-  
-  it('should not match partial LaTeX commands', () => {
-    // "alpha/b" should not match because 'a' is part of 'alpha'
-    const match = matchFraction('alpha/b');
-    // The regex should not match 'a/b' when preceded by 'lph'
-    // Actually this depends on implementation - let's check
-    if (match) {
-      // If it matches, make sure it's the right match
-      assert.ok(match.numerator !== 'a', 'Should not match partial command');
-    }
+
+  it('should not match when slash is not the last character', () => {
+    // New behaviour: trigger fires only when '/' is the last typed character
+    const match = matchFraction('a/b');
+    assert.strictEqual(match, null, 'Should not match mid-string slash');
   });
 });

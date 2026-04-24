@@ -157,7 +157,7 @@ export function processTabstops(template, basePos) {
 /**
  * Build a fraction replacement from matched parts
  *
- * @param {Object} fractionMatch - Match with numerator and denominator
+ * @param {Object} fractionMatch - Match with numerator
  * @param {number} insertPos - Position where fraction starts
  * @returns {Object} - { text, cursorPos }
  */
@@ -177,8 +177,8 @@ export function processVisualReplacement(replacement, selectedText, insertPos) {
 }
 
 export function buildFractionReplacement(fractionMatch, insertPos) {
-  const { numerator, denominator } = fractionMatch;
-  const text = `\\frac{${numerator}}{${denominator}}`;
+  const { numerator } = fractionMatch;
+  const text = `\\frac{${numerator}}{}`;
 
   // Cursor position: inside the denominator braces, after the denominator text.
   // This lets the user immediately extend the denominator (e.g. a/b → \frac{a}{b|}

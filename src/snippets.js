@@ -39,20 +39,31 @@ const GREEK_LETTERS_NORMAL = [
   'Gamma', 'Delta', 'Theta', 'Lambda', 'Xi', 'Pi', 'Sigma', 'Upsilon', 'Phi', 'Psi', 'Omega'
 ];
 
+export const FRAC_PREFIX_OPS = new Set([
+  'arcsin', 'sin', 'arccos', 'cos', 'arctan', 'tan', 'csc', 'sec', 'cot',
+  'sinh', 'cosh', 'tanh', 'coth', 'partial', 'left', 'log', 'ln', 'exp','hat', 'bar', 'tilde', 
+  'vec', 'dot', 'ddot', 'mathcal', 'mathscr', 'mathbf', 'boldsymbol', 
+]);
+  GREEK_LETTERS_HIGH_PRIORITY.forEach(letter => {
+    FRAC_PREFIX_OPS.add(letter);
+  });
+  GREEK_LETTERS_NORMAL.forEach(letter => {
+    FRAC_PREFIX_OPS.add(letter);
+  });
+
 // Generate Greek letter snippets programmatically
 // High priority letters (contain other Greek letters as suffixes)
 const greekSnippetsHighPriority = GREEK_LETTERS_HIGH_PRIORITY.map(letter => ({
   trigger: letter,
   replacement: '\\' + letter,
-  // wordBoundary prevents "abeta" from matching "beta", etc.
-  options: { mode: "math", auto: true, priority: -1, wordBoundary: true }
+  options: { mode: "math", auto: true, priority: -1 }
 }));
 
 // Normal priority Greek letters
 const greekSnippetsNormal = GREEK_LETTERS_NORMAL.map(letter => ({
   trigger: letter,
   replacement: '\\' + letter,
-  options: { mode: "math", auto: true, priority: -2, wordBoundary: true }
+  options: { mode: "math", auto: true, priority: -2}
 }));
 
 const greekSnippets = [...greekSnippetsHighPriority, ...greekSnippetsNormal];
