@@ -1,12 +1,29 @@
 /**
  * Snippet Definitions for Overleaf LaTeX Shortcuts
- * 
+ *
  * Options:
  *   mode: "math" | "text" | "any" - when the snippet should trigger
  *   auto: boolean - auto-expand without Tab (default: true for most)
  *   wordBoundary: boolean - require word boundary before trigger
  *   priority: number - higher priority matches first (default: 0)
+ *
+ * trigger may be a single string/regex OR an array of strings/regexes.
+ * Array triggers are expanded into separate snippet entries automatically.
  */
+
+function expandTriggers(snippetList) {
+  const result = [];
+  for (const snippet of snippetList) {
+    if (Array.isArray(snippet.trigger)) {
+      for (const t of snippet.trigger) {
+        result.push({ ...snippet, trigger: t });
+      }
+    } else {
+      result.push(snippet);
+    }
+  }
+  return result;
+}
 
 // ========================================
 // GREEK LETTERS (word form)
@@ -43,7 +60,7 @@ const greekSnippets = [...greekSnippetsHighPriority, ...greekSnippetsNormal];
 // ========================================
 // MAIN SNIPPET DEFINITIONS
 // ========================================
-export const snippets = [
+const rawSnippets = [
   // ----------------------------------------
   // Math/Text Mode Entry
   // ----------------------------------------
@@ -51,10 +68,10 @@ export const snippets = [
   { trigger: "dm", replacement: "$$\n$0\n$$", options: { mode: "text", auto: true, wordBoundary: true } },
   // beg: cursor starts in body ($0), Tab navigates to env name inside \begin{}
   // Both \begin and \end show "env" placeholder — second occurrence is static (not a linked tabstop)
-  { trigger: "beg", replacement: "\\begin{${1:env}}\n$0\n\\end{${1:env}}", options: { mode: "text", auto: true } },
+  { trigger: "mathbeg", replacement: "\\begin{${1:env}}\n$0\n\\end{${1:env}}", options: { mode: "text", auto: true } },
   // Text-mode display math environments — reach for these like you'd reach for dm
-  { trigger: "ali", replacement: "\\begin{align*}\n$0\n\\end{align*}", options: { mode: "text", auto: true } },
-  { trigger: "eq",  replacement: "\\begin{equation}\n$0\n\\end{equation}", options: { mode: "text", auto: true } },
+  { trigger: "mathali", replacement: "\\begin{align*}\n$0\n\\end{align*}", options: { mode: "text", auto: true } },
+  { trigger: "matheq",  replacement: "\\begin{equation}\n$0\n\\end{equation}", options: { mode: "text", auto: true } },
 
   // ----------------------------------------
   // Greek Letters (@ shortcuts)
@@ -79,11 +96,9 @@ export const snippets = [
   { trigger: "@S", replacement: "\\Sigma", options: { mode: "math", auto: true } },
   { trigger: "@u", replacement: "\\upsilon", options: { mode: "math", auto: true } },
   { trigger: "@U", replacement: "\\Upsilon", options: { mode: "math", auto: true } },
-  { trigger: "@o", replacement: "\\omega", options: { mode: "math", auto: true } },
-  { trigger: "@O", replacement: "\\Omega", options: { mode: "math", auto: true } },
+  { trigger: ["@o", "ome"], replacement: "\\omega", options: { mode: "math", auto: true } },
+  { trigger: ["@O", "Ome"], replacement: "\\Omega", options: { mode: "math", auto: true } },
   { trigger: "@p", replacement: "\\partial", options: { mode: "math", auto: true } },
-  { trigger: "ome", replacement: "\\omega", options: { mode: "math", auto: true } },
-  { trigger: "Ome", replacement: "\\Omega", options: { mode: "math", auto: true } },
 
   // Variant forms
   { trigger: "vareps", replacement: "\\varepsilon", options: { mode: "math", auto: true, priority: -1 } },
@@ -106,17 +121,13 @@ export const snippets = [
   { trigger: "//", replacement: "\\frac{$0}{$1}$2", options: { mode: "math", auto: true } },
   { trigger: "ee", replacement: "e^{ $0 }$1", options: { mode: "math", auto: true } },
   { trigger: "invs", replacement: "^{-1}", options: { mode: "math", auto: true } },
-  
+
   // Auto letter subscript: x2 -> x_{2}
-  { 
-    trigger: /([A-Za-z])(\d)/, 
-    replacement: "[[0]]_{[[1]]}", 
-    options: { mode: "math", auto: true, priority: -1 }
-  },
+  { trigger: /([A-Za-z])(\d)/, replacement: "[[0]]_{[[1]]}", options: { mode: "math", auto: true, priority: -1 } },
 
   // Functions with backslash
   { trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]", options: { mode: "math", auto: true } },
-  
+
   { trigger: "conj", replacement: "^{*}", options: { mode: "math", auto: true } },
   { trigger: "Re", replacement: "\\mathrm{Re}", options: { mode: "math", auto: true } },
   { trigger: "Im", replacement: "\\mathrm{Im}", options: { mode: "math", auto: true } },
@@ -133,107 +144,113 @@ export const snippets = [
   // Decorations (letter + decoration)
   // Higher priority than standalone versions so "Hhat" -> \hat{H} not \hat{}
   // ----------------------------------------
-  { trigger: /([a-zA-Z])hat/, replacement: "\\hat{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: /([a-zA-Z])bar/, replacement: "\\bar{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: /([a-zA-Z])cal/, replacement: "\\mathcal{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: /([a-zA-Z])scr/, replacement: "\\mathscr{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: /([a-zA-Z])dot/, replacement: "\\dot{[[0]]}", options: { mode: "math", auto: true, priority: 0 } },
-  { trigger: /([a-zA-Z])ddot/, replacement: "\\ddot{[[0]]}", options: { mode: "math", auto: true, priority: 2 } },
+  { trigger: /([a-zA-Z])hat/,   replacement: "\\hat{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: /([a-zA-Z])bar/,   replacement: "\\bar{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: /([a-zA-Z])cal/,   replacement: "\\mathcal{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: /([a-zA-Z])scr/,   replacement: "\\mathscr{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: /([a-zA-Z])dot/,   replacement: "\\dot{[[0]]}", options: { mode: "math", auto: true, priority: 0 } },
+  { trigger: /([a-zA-Z])ddot/,  replacement: "\\ddot{[[0]]}", options: { mode: "math", auto: true, priority: 2 } },
   { trigger: /([a-zA-Z])tilde/, replacement: "\\tilde{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: /([a-zA-Z])und/, replacement: "\\underline{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: /([a-zA-Z])vec/, replacement: "\\vec{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
-  
+  { trigger: /([a-zA-Z])und/,   replacement: "\\underline{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: /([a-zA-Z])vec/,   replacement: "\\vec{[[0]]}", options: { mode: "math", auto: true, priority: 1 } },
+
   // Bold shortcuts: x,. or x., -> \mathbf{x}
-  { trigger: /([a-zA-Z]),\./, replacement: "\\mathbf{[[0]]}", options: { mode: "math", auto: true } },
-  { trigger: /([a-zA-Z])\.,/, replacement: "\\mathbf{[[0]]}", options: { mode: "math", auto: true } },
+  { trigger: [/([a-zA-Z]),\./, /([a-zA-Z])\.,/], replacement: "\\mathbf{[[0]]}", options: { mode: "math", auto: true } },
 
   // Standalone decorations (with tabstop)
   // Lower priority than letter+decoration regex versions
-  { trigger: "hat", replacement: "\\hat{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "bar", replacement: "\\bar{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "cal", replacement: "\\mathcal{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "scr", replacement: "\\mathscr{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "dot", replacement: "\\dot{$0}$1", options: { mode: "math", auto: true, priority: -2 } },
-  { trigger: "ddot", replacement: "\\ddot{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "cdot", replacement: "\\cdot", options: { mode: "math", auto: true } },
-  { trigger: "tilde", replacement: "\\tilde{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "und", replacement: "\\underline{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
-  { trigger: "vec", replacement: "\\vec{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "hat",   replacement: "\\hat{$0}$1",       options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "bar",   replacement: "\\bar{$0}$1",       options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "cal",   replacement: "\\mathcal{$0}$1",   options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "scr",   replacement: "\\mathscr{$0}$1",   options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "dot",   replacement: "\\dot{$0}$1",       options: { mode: "math", auto: true, priority: -2 } },
+  { trigger: "ddot",  replacement: "\\ddot{$0}$1",      options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "tilde", replacement: "\\tilde{$0}$1",     options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "und",   replacement: "\\underline{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
+  { trigger: "vec",   replacement: "\\vec{$0}$1",       options: { mode: "math", auto: true, priority: -1 } },
 
   // ----------------------------------------
   // More Auto Subscripts
   // ----------------------------------------
   { trigger: /([A-Za-z])_(\d\d)/, replacement: "[[0]]_{[[1]]}", options: { mode: "math", auto: true } },
-  { trigger: /\\hat\{([A-Za-z])\}(\d)/, replacement: "\\hat{[[0]]}_{[[1]]}", options: { mode: "math", auto: true } },
-  { trigger: /\\vec\{([A-Za-z])\}(\d)/, replacement: "\\vec{[[0]]}_{[[1]]}", options: { mode: "math", auto: true } },
+  { trigger: /\\hat\{([A-Za-z])\}(\d)/,    replacement: "\\hat{[[0]]}_{[[1]]}", options: { mode: "math", auto: true } },
+  { trigger: /\\vec\{([A-Za-z])\}(\d)/,    replacement: "\\vec{[[0]]}_{[[1]]}", options: { mode: "math", auto: true } },
   { trigger: /\\mathbf\{([A-Za-z])\}(\d)/, replacement: "\\mathbf{[[0]]}_{[[1]]}", options: { mode: "math", auto: true } },
 
-  { trigger: "xnn", replacement: "x_{n}", options: { mode: "math", auto: true } },
-  { trigger: "\\xii", replacement: "x_{i}", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: "xjj", replacement: "x_{j}", options: { mode: "math", auto: true } },
-  { trigger: "xp1", replacement: "x_{n+1}", options: { mode: "math", auto: true } },
-  { trigger: "ynn", replacement: "y_{n}", options: { mode: "math", auto: true } },
-  { trigger: "yii", replacement: "y_{i}", options: { mode: "math", auto: true } },
-  { trigger: "yjj", replacement: "y_{j}", options: { mode: "math", auto: true } },
+  { trigger: "xnn",  replacement: "x_{n}",   options: { mode: "math", auto: true } },
+  { trigger: "\\xii", replacement: "x_{i}",  options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: "xjj",  replacement: "x_{j}",   options: { mode: "math", auto: true } },
+  { trigger: "xp1",  replacement: "x_{n+1}", options: { mode: "math", auto: true } },
+  { trigger: "ynn",  replacement: "y_{n}",   options: { mode: "math", auto: true } },
+  { trigger: "yii",  replacement: "y_{i}",   options: { mode: "math", auto: true } },
+  { trigger: "yjj",  replacement: "y_{j}",   options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Symbols
   // ----------------------------------------
-  { trigger: "ooo", replacement: "\\infty", options: { mode: "math", auto: true } },
-  { trigger: "sum", replacement: "\\sum", options: { mode: "math", auto: true } },
-  { trigger: "prod", replacement: "\\prod", options: { mode: "math", auto: true } },
-  { trigger: "\\sum", replacement: "\\sum_{$0}^{$1} $2", options: { mode: "math", auto: false } },
+  { trigger: ["ooo", "infty", "nfty"], replacement: "\\infty", options: { mode: "math", auto: true } },
+  { trigger: "sum",   replacement: "\\sum",  options: { mode: "math", auto: true } },
+  { trigger: "prod",  replacement: "\\prod", options: { mode: "math", auto: true } },
+  { trigger: "\\sum",  replacement: "\\sum_{$0}^{$1} $2",  options: { mode: "math", auto: false } },
   { trigger: "\\prod", replacement: "\\prod_{$0}^{$1} $2", options: { mode: "math", auto: false } },
   { trigger: "lim", replacement: "\\lim_{ ${0:n} \\to ${1:\\infty} } $2", options: { mode: "math", auto: true } },
-  { trigger: "argmin", replacement: "\\operatorname{\\argmin}", options: { mode: "math", auto: true } },
-  { trigger: "argmax", replacement: "\\operatorname{\\argmax}", options: { mode: "math", auto: true } },
-  { trigger: "ber", replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
-  { trigger: "Ber", replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
-  { trigger: "+-", replacement: "\\pm", options: { mode: "math", auto: true } },
-  { trigger: "-+", replacement: "\\mp", options: { mode: "math", auto: true } },
+  { trigger: "argmin", replacement: "\\operatorname{argmin}", options: { mode: "math", auto: true } },
+  { trigger: "argmax", replacement: "\\operatorname{argmax}", options: { mode: "math", auto: true } },
+  { trigger: ["ber", "Ber"], replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
+  { trigger: "Var", replacement: "\\operatorname{Var}", options: { mode: "math", auto: true } },
+  { trigger: "Cov", replacement: "\\operatorname{Cov}", options: { mode: "math", auto: true } },
+  { trigger: "+-",  replacement: "\\pm",   options: { mode: "math", auto: true } },
+  { trigger: "-+",  replacement: "\\mp",   options: { mode: "math", auto: true } },
   { trigger: "...", replacement: "\\dots", options: { mode: "math", auto: true } },
-  { trigger: "nabl", replacement: "\\nabla", options: { mode: "math", auto: true } },
-  { trigger: "del", replacement: "\\nabla", options: { mode: "math", auto: true } },
-  { trigger: "xx", replacement: "\\times", options: { mode: "math", auto: true } },
-  { trigger: "**", replacement: "\\cdot", options: { mode: "math", auto: true } },
-  { trigger: "para", replacement: "\\parallel", options: { mode: "math", auto: true } },
+  { trigger: ["nabl", "del"], replacement: "\\nabla",   options: { mode: "math", auto: true } },
+  { trigger: ["xx", "times"], replacement: "\\times",   options: { mode: "math", auto: true } },
+  { trigger: ["**", "cdot"], replacement: "\\cdot",    options: { mode: "math", auto: true } },
+  { trigger: ["otimes", "ox"], replacement: "\\otimes", options: { mode: "math", auto: true } },
+  { trigger: ["oplus", "o+"], replacement: "\\oplus",  options: { mode: "math", auto: true } },
+  { trigger: "para",   replacement: "\\parallel", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Relations
   // ----------------------------------------
-  { trigger: "===", replacement: "\\equiv", options: { mode: "math", auto: true } },
-  { trigger: "!=", replacement: "\\neq", options: { mode: "math", auto: true } },
-  { trigger: ">=", replacement: "\\geq", options: { mode: "math", auto: true } },
-  { trigger: "<=", replacement: "\\leq", options: { mode: "math", auto: true } },
-  { trigger: ">>", replacement: "\\gg", options: { mode: "math", auto: true } },
-  { trigger: "<<", replacement: "\\ll", options: { mode: "math", auto: true } },
-  { trigger: "simm", replacement: "\\sim", options: { mode: "math", auto: true } },
-  { trigger: "sim=", replacement: "\\simeq", options: { mode: "math", auto: true } },
+  { trigger: "===",  replacement: "\\equiv",  options: { mode: "math", auto: true } },
+  { trigger: "!=",   replacement: "\\neq",    options: { mode: "math", auto: true } },
+  { trigger: ">=",   replacement: "\\geq",    options: { mode: "math", auto: true } },
+  { trigger: "<=",   replacement: "\\leq",    options: { mode: "math", auto: true } },
+  { trigger: ">>",   replacement: "\\gg",     options: { mode: "math", auto: true } },
+  { trigger: "<<",   replacement: "\\ll",     options: { mode: "math", auto: true } },
+  { trigger: "simm", replacement: "\\sim",    options: { mode: "math", auto: true } },
+  { trigger: "sim=", replacement: "\\simeq",  options: { mode: "math", auto: true } },
   { trigger: "prop", replacement: "\\propto", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Arrows
   // ----------------------------------------
   { trigger: "<->", replacement: "\\leftrightarrow ", options: { mode: "math", auto: true } },
-  { trigger: "->", replacement: "\\to", options: { mode: "math", auto: true } },
-  { trigger: "!>", replacement: "\\mapsto", options: { mode: "math", auto: true } },
-  { trigger: "=>", replacement: "\\implies", options: { mode: "math", auto: true } },
-  { trigger: "=<", replacement: "\\impliedby", options: { mode: "math", auto: true } },
+  { trigger: "->",  replacement: "\\to",              options: { mode: "math", auto: true } },
+  { trigger: "!>",  replacement: "\\mapsto",          options: { mode: "math", auto: true } },
+  { trigger: "=>",  replacement: "\\implies",         options: { mode: "math", auto: true } },
+  { trigger: "=<",  replacement: "\\impliedby",       options: { mode: "math", auto: true } },
+  { trigger: ["larr",  "leftarr"],       replacement: "\\leftarrow",      options: { mode: "math", auto: true } },
+  { trigger: ["Larr",  "Leftarr"],       replacement: "\\Leftarrow",      options: { mode: "math", auto: true } },
+  { trigger: ["rarr",  "rightarr"],      replacement: "\\rightarrow",     options: { mode: "math", auto: true } },
+  { trigger: ["Rarr",  "Rightarr"],      replacement: "\\Rightarrow",     options: { mode: "math", auto: true } },
+  { trigger: ["lrarr", "leftrightarr"],  replacement: "\\leftrightarrow", options: { mode: "math", auto: true } },
+  { trigger: ["Lrarr", "Leftrightarr"],  replacement: "\\Leftrightarrow", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Set Theory
   // ----------------------------------------
-  { trigger: "and", replacement: "\\cap", options: { mode: "math", auto: true } },
-  { trigger: "orr", replacement: "\\cup", options: { mode: "math", auto: true } },
-  { trigger: "inn", replacement: "\\in", options: { mode: "math", auto: true } },
-  { trigger: "notin", replacement: "\\not\\in", options: { mode: "math", auto: true } },
+  { trigger: "and",    replacement: "\\cap",      options: { mode: "math", auto: true } },
+  { trigger: "orr",    replacement: "\\cup",      options: { mode: "math", auto: true } },
+  { trigger: "inn",    replacement: "\\in",       options: { mode: "math", auto: true } },
+  { trigger: "notin",  replacement: "\\not\\in",  options: { mode: "math", auto: true } },
   { trigger: "\\\\\\", replacement: "\\setminus", options: { mode: "math", auto: true } },
-  { trigger: "sub=", replacement: "\\subseteq", options: { mode: "math", auto: true } },
-  { trigger: "sup=", replacement: "\\supseteq", options: { mode: "math", auto: true } },
-  { trigger: "eset", replacement: "\\emptyset", options: { mode: "math", auto: true } },
-  { trigger: "set", replacement: "\\{ $0 \\}$1", options: { mode: "math", auto: true } },
-  { trigger: "exists", replacement: "\\exists", options: { mode: "math", auto: true, priority: 1 } },
-  { trigger: "forall", replacement: "\\forall", options: { mode: "math", auto: true, wordBoundary: true } },
+  { trigger: "sub=",   replacement: "\\subseteq", options: { mode: "math", auto: true } },
+  { trigger: "sup=",   replacement: "\\supseteq", options: { mode: "math", auto: true } },
+  { trigger: "eset",   replacement: "\\emptyset", options: { mode: "math", auto: true } },
+  { trigger: "set",    replacement: "\\{ $0 \\}$1", options: { mode: "math", auto: true } },
+  { trigger: "exists", replacement: "\\exists",   options: { mode: "math", auto: true, priority: 1 } },
+  { trigger: "forall", replacement: "\\forall",   options: { mode: "math", auto: true, wordBoundary: true } },
 
   // ----------------------------------------
   // Blackboard & Calligraphic
@@ -297,8 +314,6 @@ export const snippets = [
   // ----------------------------------------
   { trigger: "hbar", replacement: "\\hbar", options: { mode: "math", auto: true, priority: 2 } },
   { trigger: "dag", replacement: "^{\\dagger}", options: { mode: "math", auto: true } },
-  { trigger: "o+", replacement: "\\oplus ", options: { mode: "math", auto: true } },
-  { trigger: "ox", replacement: "\\otimes ", options: { mode: "math", auto: true } },
   { trigger: "bra", replacement: "\\bra{$0} $1", options: { mode: "math", auto: true } },
   { trigger: "ket", replacement: "\\ket{$0} $1", options: { mode: "math", auto: true } },
   { trigger: "brk", replacement: "\\braket{ $0 | $1 } $2", options: { mode: "math", auto: true } },
@@ -324,7 +339,6 @@ export const snippets = [
   { trigger: "matrix", replacement: "\\begin{matrix}\n$0\n\\end{matrix}", options: { mode: "math", auto: true } },
 
   { trigger: "cases", replacement: "\\begin{cases}\n$0\n\\end{cases}", options: { mode: "math", auto: true } },
-  { trigger: "align", replacement: "\\begin{align}\n$0\n\\end{align}", options: { mode: "math", auto: true } },
   { trigger: "array", replacement: "\\begin{array}\n$0\n\\end{array}", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
@@ -380,5 +394,7 @@ export const snippets = [
   // Add Greek letter word snippets
   ...greekSnippets,
 ];
+
+export const snippets = expandTriggers(rawSnippets);
 
 export default snippets;

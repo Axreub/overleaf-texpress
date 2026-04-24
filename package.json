@@ -11,6 +11,6 @@
   "devDependencies": {
     "esbuild": "^0.20.0"
   },
-  "author": "Axel Riley",
+  "author": "Axel Riley, Hugo Rippe, Edvard Oxelström, Kevin Hamed",
   "license": "MIT"
 }
