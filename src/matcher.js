@@ -4,6 +4,8 @@
  * Finds matching snippets based on text before cursor, mode, and priority.
  */
 
+import { FRAC_PREFIX_OPS } from './snippets';
+
 /**
  * Check if a snippet's mode requirement is satisfied
  * @param {Object} snippet - Snippet definition
@@ -195,7 +197,7 @@ export function matchFraction(textBefore) {
   // Trigger fires the instant '/' is typed at the end of input
   if (s[len - 1] !== '/') return null;
 
-  // Scan the numerator ending just before the slash
+  // len - 1 is the slash, grab starting from prev char
   const { token: numerator, consumed, singleChar } = scanTokenLeft(s, len - 2);
   if (!numerator) return null;
 
@@ -235,12 +237,33 @@ function scanTokenLeft(s, pos) {
     if (!base.token) break;
     consumed += 1 + base.consumed;
   }
-  const sliceStart = pos - consumed + 1;
-  const beforeToken = s.slice(0, sliceStart);
-  const partialMatch = beforeToken.match(/(\\partial)\s+$/);
-  if (partialMatch) {
-    consumed += partialMatch[0].length;
-    
+
+  while (true) {
+    const before = s.slice(0, pos - consumed + 1);
+  
+    // Whitelisted \cmd with optional single space (\partial x, \sin x)
+    const cmdPeek = before.match(/\\([a-zA-Z]+)\s?$/);
+    if (cmdPeek && FRAC_PREFIX_OPS.has(cmdPeek[1])) {
+      consumed += cmdPeek[0].length;
+      continue;
+    }
+  
+    // Any \cmd directly adjacent, no space (x\alpha)
+    const adjCmdPeek = before.match(/\\[a-zA-Z]+$/);
+    if (adjCmdPeek) {
+      consumed += adjCmdPeek[0].length;
+      continue;
+    }
+  
+    // Adjacent letters/digits (df in df(x))
+    const wordPeek = before.match(/[a-zA-Z0-9]+$/);
+    if (wordPeek) {
+      consumed += wordPeek[0].length;
+      continue;
+    }
+  
+    break;
+  }
   if (consumed > atom.consumed) {
     return { token: s.slice(pos - consumed + 1, pos + 1), consumed, singleChar: false };
   }
@@ -256,22 +279,20 @@ function scanTokenLeft(s, pos) {
 function scanAtom(s, pos) {
   if (pos < 0) return { token: null, consumed: 0, singleChar: false };
 
-  // Parenthesised group: (...) — no nested parens allowed
+  // Parenthesised group: (...)
   if (s[pos] === ')') {
-    const openPos = s.lastIndexOf('(', pos - 1);
-    if (openPos >= 0 && !s.slice(openPos + 1, pos).includes('(') && !s.slice(openPos + 1, pos).includes(')')) {
+    const openPos = findMatchingOpenParen(s, pos, 'regular');
+    if (openPos >= 0) {
       const inner = s.slice(openPos + 1, pos);
       return { token: inner, consumed: pos - openPos + 1, singleChar: false };
     }
     return { token: null, consumed: 0, singleChar: false };
   }
 
-  // LaTeX command with braced arg: \cmd{...} or just \cmd
   if (s[pos] === '}') {
-    const openBrace = s.lastIndexOf('{', pos - 1);
+    const openBrace = findMatchingOpenParen(s, pos, 'curly');
     if (openBrace >= 0) {
       const arg = s.slice(openBrace + 1, pos);
-      // Find the \command before the brace
       let cmdEnd = openBrace - 1;
       if (cmdEnd >= 0 && /[a-zA-Z]/.test(s[cmdEnd])) {
         let cmdStart = cmdEnd;
@@ -282,10 +303,10 @@ function scanAtom(s, pos) {
           return { token: `${cmd}{${arg}}`, consumed, singleChar: false };
         }
       }
-      // fallback to non-command braces
-      return { token: '{${arg}}', consumed: pos - openBrace + 1, singleChar: false };
+      // Bare brace group, no command
+      return { token: `{${arg}}`, consumed: pos - openBrace + 1, singleChar: false };
     }
-    return { token: '}', consumed: 1, singleChar: true };
+    return { token: null, consumed: 0, singleChar: false };
   }
 
   // Plain LaTeX command: \cmd
@@ -297,8 +318,9 @@ function scanAtom(s, pos) {
       const cmd = s.slice(start - 1, end + 1);
       return { token: cmd, consumed: end - start + 2, singleChar: false };
     }
-    // Single alphanumeric character
-    return { token: s[pos], consumed: 1, singleChar: true };
+    // not a command
+    const word = s.slice(start, end + 1);
+    return { token: word, consumed: end - start + 1, singleChar: word.length === 1 };
   }
 
   // Single digit
@@ -309,4 +331,24 @@ function scanAtom(s, pos) {
   return { token: null, consumed: 0, singleChar: false };
 }
 
+function findMatchingOpenParen(s, closePos, parenType) {
+  if (parenType === 'regular') {
+    rightParen = ')';
+    leftParen = '(';
+  } else if (parenType === 'square') {
+    rightParen = ']';
+    leftParen = '[';
+  } else if (parenType === 'curly') {
+    rightParen = '}';
+    leftParen = '{';
+  }
+  let depth = 1;
+  let i = closePos - 1;
+  while (i >= 0 && depth > 0) {
+    if (s[i] === rightParen) depth++;
+    else if (s[i] === leftParen) depth--;
+    i--;
+  }
+  return depth === 0 ? i + 1 : -1;
+}
 export default findMatch;
