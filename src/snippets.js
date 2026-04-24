@@ -51,10 +51,10 @@ export const snippets = [
   { trigger: "dm", replacement: "$$\n$0\n$$", options: { mode: "text", auto: true, wordBoundary: true } },
   // beg: cursor starts in body ($0), Tab navigates to env name inside \begin{}
   // Both \begin and \end show "env" placeholder — second occurrence is static (not a linked tabstop)
-  { trigger: "beg", replacement: "\\begin{${1:env}}\n$0\n\\end{${1:env}}", options: { mode: "text", auto: true } },
+  { trigger: "mathbeg", replacement: "\\begin{${1:env}}\n$0\n\\end{${1:env}}", options: { mode: "text", auto: true } },
   // Text-mode display math environments — reach for these like you'd reach for dm
-  { trigger: "ali", replacement: "\\begin{align*}\n$0\n\\end{align*}", options: { mode: "text", auto: true } },
-  { trigger: "eq",  replacement: "\\begin{equation}\n$0\n\\end{equation}", options: { mode: "text", auto: true } },
+  { trigger: "mathali", replacement: "\\begin{align*}\n$0\n\\end{align*}", options: { mode: "text", auto: true } },
+  { trigger: "matheq",  replacement: "\\begin{equation}\n$0\n\\end{equation}", options: { mode: "text", auto: true } },
 
   // ----------------------------------------
   // Greek Letters (@ shortcuts)
@@ -156,6 +156,9 @@ export const snippets = [
   { trigger: "dot", replacement: "\\dot{$0}$1", options: { mode: "math", auto: true, priority: -2 } },
   { trigger: "ddot", replacement: "\\ddot{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
   { trigger: "cdot", replacement: "\\cdot", options: { mode: "math", auto: true } },
+  {trigger: "times", replacement: "\\times", options: { mode: "math", auto: true } },
+  {trigger: "otimes", replacement: "\\otimes", options: { mode: "math", auto: true } },
+  {trigger: "oplus", replacement: "\\oplus", options: { mode: "math", auto: true } },
   { trigger: "tilde", replacement: "\\tilde{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
   { trigger: "und", replacement: "\\underline{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
   { trigger: "vec", replacement: "\\vec{$0}$1", options: { mode: "math", auto: true, priority: -1 } },
@@ -180,15 +183,19 @@ export const snippets = [
   // Symbols
   // ----------------------------------------
   { trigger: "ooo", replacement: "\\infty", options: { mode: "math", auto: true } },
+  { trigger: "infty", replacement: "\\infty", options: { mode: "math", auto: true } },
+  { trigger: "nfty", replacement: "\\infty", options: { mode: "math", auto: true } },
   { trigger: "sum", replacement: "\\sum", options: { mode: "math", auto: true } },
   { trigger: "prod", replacement: "\\prod", options: { mode: "math", auto: true } },
   { trigger: "\\sum", replacement: "\\sum_{$0}^{$1} $2", options: { mode: "math", auto: false } },
   { trigger: "\\prod", replacement: "\\prod_{$0}^{$1} $2", options: { mode: "math", auto: false } },
   { trigger: "lim", replacement: "\\lim_{ ${0:n} \\to ${1:\\infty} } $2", options: { mode: "math", auto: true } },
-  { trigger: "argmin", replacement: "\\operatorname{\\argmin}", options: { mode: "math", auto: true } },
-  { trigger: "argmax", replacement: "\\operatorname{\\argmax}", options: { mode: "math", auto: true } },
+  { trigger: "argmin", replacement: "\\operatorname{argmin}", options: { mode: "math", auto: true } },
+  { trigger: "argmax", replacement: "\\operatorname{argmax}", options: { mode: "math", auto: true } },
   { trigger: "ber", replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
   { trigger: "Ber", replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
+  {trigger: "Var", replacement: "\\operatorname{Var}", options: { mode: "math", auto: true } },
+  {trigger: "Cov", replacement: "\\operatorname{Cov}", options: { mode: "math", auto: true } },
   { trigger: "+-", replacement: "\\pm", options: { mode: "math", auto: true } },
   { trigger: "-+", replacement: "\\mp", options: { mode: "math", auto: true } },
   { trigger: "...", replacement: "\\dots", options: { mode: "math", auto: true } },
@@ -219,7 +226,19 @@ export const snippets = [
   { trigger: "!>", replacement: "\\mapsto", options: { mode: "math", auto: true } },
   { trigger: "=>", replacement: "\\implies", options: { mode: "math", auto: true } },
   { trigger: "=<", replacement: "\\impliedby", options: { mode: "math", auto: true } },
-
+  {trigger: "larr", replacement: "\\leftarrow", options: { mode: "math", auto: true } },
+  {trigger: "Larr", replacement: "\\Leftarrow", options: { mode: "math", auto: true } },
+  {trigger: "rarr", replacement: "\\rightarrow", options: { mode: "math", auto: true } },
+  {trigger: "Rarr", replacement: "\\Rightarrow", options: { mode: "math", auto: true } },
+  {trigger: "lrarr", replacement: "\\leftrightarrow", options: { mode: "math", auto: true } },
+  {trigger: "Lrarr", replacement: "\\Leftrightarrow", options: { mode: "math", auto: true } },
+  // these are longer but users will type them intuitively
+  {trigger: "leftarr", replacement: "\\leftarrow", options: { mode: "math", auto: true } },
+  {trigger: "Leftarr", replacement: "\\Leftarrow", options: { mode: "math", auto: true } },
+  {trigger: "rightarr", replacement: "\\rightarrow", options: { mode: "math", auto: true } },
+  {trigger: "Rightarr", replacement: "\\Rightarrow", options: { mode: "math", auto: true } },
+  {trigger: "leftrightarr", replacement: "\\leftrightarrow", options: { mode: "math", auto: true } },
+  {trigger: "Leftrightarr", replacement: "\\Leftrightarrow", options: { mode: "math", auto: true } },
   // ----------------------------------------
   // Set Theory
   // ----------------------------------------
@@ -324,7 +343,6 @@ export const snippets = [
   { trigger: "matrix", replacement: "\\begin{matrix}\n$0\n\\end{matrix}", options: { mode: "math", auto: true } },
 
   { trigger: "cases", replacement: "\\begin{cases}\n$0\n\\end{cases}", options: { mode: "math", auto: true } },
-  { trigger: "align", replacement: "\\begin{align}\n$0\n\\end{align}", options: { mode: "math", auto: true } },
   { trigger: "array", replacement: "\\begin{array}\n$0\n\\end{array}", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
