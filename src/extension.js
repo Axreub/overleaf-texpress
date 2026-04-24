@@ -40,6 +40,16 @@ function getTextAfter(state, pos, maxLength = 50) {
 // Closing brackets for Tab jumping
 const CLOSING_BRACKETS = [')', ']', '}'];
 
+// Set of known complete LaTeX command names (the part after \) derived from snippet
+// replacements. Used to guard auto-space: only insert a space when the existing
+// \command is a known complete command, not when the user is still typing it.
+const knownCommands = new Set(
+  snippets
+    .map(s => (typeof s.replacement === 'string' ? s.replacement.match(/^\\([a-zA-Z]+)/) : null))
+    .filter(Boolean)
+    .map(m => m[1])
+);
+
 // LaTeX commands whose presence inside brackets means the brackets need \left/\right sizing
 export const TALL_CONTENT_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
 
@@ -133,13 +143,15 @@ function createInputHandler(tabstopEffects) {
     // command). Insert a space so the next character starts fresh.
     // Only triggers when: in math mode, typing a single letter, and the text
     // immediately before the cursor ends with \command (backslash + letters, no {).
-    if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text) &&
-      /\\[a-zA-Z]+$/.test(existingTextBefore)) {
-      view.dispatch({
-        changes: { from, to, insert: ' ' + text },
-        selection: { anchor: from + 2 }
-      });
-      return true;
+    if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text)) {
+      const cmdMatch = existingTextBefore.match(/\\([a-zA-Z]+)$/);
+      if (cmdMatch && knownCommands.has(cmdMatch[1])) {
+        view.dispatch({
+          changes: { from, to, insert: ' ' + text },
+          selection: { anchor: from + 2 }
+        });
+        return true;
+      }
     }
 
     // Auto-size brackets: when ) or ] is typed in math mode, scan back for the
