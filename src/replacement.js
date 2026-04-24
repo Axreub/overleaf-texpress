@@ -1,8 +1,8 @@
 /**
  * Replacement Template Processing
- * 
+ *
  * Handles tabstop markers ($0, $1, ${0:default}), regex captures ([[0]], [[1]]),
- * and function-based replacements.
+ * [[VISUAL]] substitution, and function-based replacements.
  */
 
 /**
@@ -161,6 +161,21 @@ export function processTabstops(template, basePos) {
  * @param {number} insertPos - Position where fraction starts
  * @returns {Object} - { text, cursorPos }
  */
+/**
+ * Substitute [[VISUAL]] in a template with the selected text, then process tabstops.
+ *
+ * @param {string|Function} replacement - Replacement template or function
+ * @param {string} selectedText - The currently selected text
+ * @param {number} insertPos - Position where the replacement will be inserted
+ * @returns {Object} - { text, cursorPos, tabstops }
+ */
+export function processVisualReplacement(replacement, selectedText, insertPos) {
+  const template = typeof replacement === 'function'
+    ? replacement([selectedText])
+    : replacement.replace(/\[\[VISUAL\]\]/g, selectedText);
+  return processTabstops(template, insertPos);
+}
+
 export function buildFractionReplacement(fractionMatch, insertPos) {
   const { numerator } = fractionMatch;
   const text = `\\frac{${numerator}}{}`;
