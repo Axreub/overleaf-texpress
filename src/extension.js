@@ -256,6 +256,9 @@ function createTabCommand(tabstopField, tabstopEffects) {
   return (view) => {
     const state = view.state;
 
+    // With a selection, let CM6 indent the selected lines normally.
+    if (!state.selection.main.empty) return false;
+
     // Check for active tabstops first
     const tabstopState = state.field(tabstopField, false);
     if (tabstopState && hasActiveTabstops(tabstopState)) {
@@ -269,24 +272,41 @@ function createTabCommand(tabstopField, tabstopEffects) {
       }
     }
 
-    // Smart forward scan: find next }, ), ] on the current line and jump past it.
-    // This lets Tab navigate through nested LaTeX structures without needing
-    // snippet-inserted tabstops.
+    // Smart forward scan: find next }, ), ] or $ and jump past it.
+    // Scans current line first, then up to 5 subsequent lines so that closing
+    // $$ on its own line (dm, ali, eq) is reachable.
     const pos = state.selection.main.head;
-    const line = state.doc.lineAt(pos);
+    const doc = state.doc;
+    const line = doc.lineAt(pos);
 
     // At or before the first non-whitespace character, the user wants to indent.
-    const lineText = state.doc.sliceString(line.from, line.to);
+    const lineText = doc.sliceString(line.from, line.to);
     const firstNonSpace = lineText.search(/\S/);
     const contentStart = firstNonSpace === -1 ? line.to : line.from + firstNonSpace;
     if (pos <= contentStart) return false;
 
-    const lineEnd = line.to;
-    const restOfLine = state.doc.sliceString(pos, lineEnd);
-    const nextBracket = restOfLine.search(/[}\)\]$]/);
-    if (nextBracket !== -1) {
-      view.dispatch({ selection: { anchor: pos + nextBracket + 1 } });
-      return true;
+    // Inside matrix environments, & is also a jump target.
+    const inMatrix = MATRIX_ENVS.has(getCurrentEnvironment(getTextBefore(state, pos)) ?? '');
+    const scanRe = inMatrix ? /[}\)\]$&]/ : /[}\)\]$]/;
+
+    // $$ counts as one jump unit — advance past both characters.
+    function jumpPast(text, idx, baseDocPos) {
+      const isDollar = text[idx] === '$';
+      const advance = (isDollar && text[idx + 1] === '$') ? 2 : 1;
+      view.dispatch({ selection: { anchor: baseDocPos + idx + advance } });
+    }
+
+    // Scan rest of current line
+    const restOfLine = doc.sliceString(pos, line.to);
+    const cur = restOfLine.search(scanRe);
+    if (cur !== -1) { jumpPast(restOfLine, cur, pos); return true; }
+
+    // Scan subsequent lines (covers closing $$ on its own line)
+    for (let n = line.number + 1; n <= Math.min(doc.lines, line.number + 5); n++) {
+      const nl = doc.line(n);
+      const nlText = doc.sliceString(nl.from, nl.to);
+      const idx = nlText.search(scanRe);
+      if (idx !== -1) { jumpPast(nlText, idx, nl.from); return true; }
     }
 
     return false; // Let default Tab behavior happen
@@ -300,35 +320,124 @@ function createTabCommand(tabstopField, tabstopEffects) {
 function createShiftTabCommand() {
   return (view) => {
     const state = view.state;
+    // With a selection, let CM6 de-indent the selected lines normally.
+    if (!state.selection.main.empty) return false;
+
     const pos = state.selection.main.head;
     const line = state.doc.lineAt(pos);
     const lineStart = line.from;
 
-    // At or before the first non-whitespace character, let CM6 de-indent normally.
+    // Let CM6 de-indent when the line has leading whitespace and the cursor is
+    // at or before the first non-whitespace character. When there is no leading
+    // whitespace (firstNonSpace === 0, e.g. a $$ line) always navigate instead.
     const lineText = state.doc.sliceString(lineStart, line.to);
     const firstNonSpace = lineText.search(/\S/);
     const contentStart = firstNonSpace === -1 ? line.to : lineStart + firstNonSpace;
-    if (pos <= contentStart) return false;
+    if (firstNonSpace > 0 && pos <= contentStart) return false;
 
-    const beforeCursor = state.doc.sliceString(lineStart, pos);
+    const doc = state.doc;
+    const beforeCursor = doc.sliceString(lineStart, pos);
+    const inMatrix = MATRIX_ENVS.has(getCurrentEnvironment(doc.sliceString(Math.max(0, pos - 500), pos)) ?? '');
 
-    // Walk backward to find the last closing bracket before the cursor.
-    // Start at length-2 to skip the character immediately left of the cursor —
-    // otherwise a } right at the cursor would match itself and the cursor wouldn't move.
+    // Walk backward on current line. Start at length-2 to skip the character
+    // immediately left of the cursor so we don't re-land on the same position.
     for (let i = beforeCursor.length - 2; i >= 0; i--) {
       const ch = beforeCursor[i];
-      if (ch === '}' || ch === ')' || ch === ']') {
+      if (ch === '}' || ch === ')' || ch === ']' || (inMatrix && ch === '&')) {
         view.dispatch({ selection: { anchor: lineStart + i + 1 } });
         return true;
       }
       if (ch === '$') {
-        // Jump to BEFORE the $ to exit math mode on the left
-        view.dispatch({ selection: { anchor: lineStart + i } });
+        // Jump to BEFORE the $ (or $$) to exit math mode on the left
+        const target = (i > 0 && beforeCursor[i - 1] === '$') ? i - 1 : i;
+        view.dispatch({ selection: { anchor: lineStart + target } });
         return true;
       }
     }
 
-    return true; // No bracket found but cursor is mid-sentence — consume to avoid de-indent
+    // Nothing on current line — scan previous lines (covers opening $$ on its own line)
+    for (let n = line.number - 1; n >= Math.max(1, line.number - 5); n--) {
+      const pl = doc.line(n);
+      const plText = doc.sliceString(pl.from, pl.to);
+      for (let i = plText.length - 1; i >= 0; i--) {
+        const ch = plText[i];
+        if (ch === '}' || ch === ')' || ch === ']' || (inMatrix && ch === '&')) {
+          view.dispatch({ selection: { anchor: pl.from + i + 1 } });
+          return true;
+        }
+        if (ch === '$') {
+          const target = (i > 0 && plText[i - 1] === '$') ? i - 1 : i;
+          view.dispatch({ selection: { anchor: pl.from + target } });
+          return true;
+        }
+      }
+    }
+
+    return true; // No bracket found mid-sentence — consume to avoid de-indent
+  };
+}
+
+// Environments where Enter/Shift-Enter get matrix-specific bindings
+const MATRIX_ENVS = new Set([
+  'matrix', 'pmatrix', 'bmatrix', 'Bmatrix', 'vmatrix', 'Vmatrix',
+  'align', 'align*', 'aligned', 'cases', 'array'
+]);
+
+/**
+ * Return the name of the innermost unclosed \begin{} environment before the
+ * cursor, or null if the cursor is not inside any known environment.
+ */
+function getCurrentEnvironment(textBefore) {
+  const regex = /\\(begin|end)\{([^}]+)\}/g;
+  const stack = [];
+  let m;
+  while ((m = regex.exec(textBefore)) !== null) {
+    if (m[1] === 'begin') {
+      stack.push(m[2]);
+    } else if (stack.length > 0 && stack[stack.length - 1] === m[2]) {
+      stack.pop();
+    }
+  }
+  return stack.length > 0 ? stack[stack.length - 1] : null;
+}
+
+/**
+ * Enter inside matrix environments inserts \\ + newline (end of row).
+ * Outside matrix environments falls through to CM6's default newline.
+ */
+function createEnterCommand() {
+  return (view) => {
+    const state = view.state;
+    if (!state.selection.main.empty) return false;
+    const pos = state.selection.main.head;
+    const env = getCurrentEnvironment(getTextBefore(state, pos));
+    if (!env || !MATRIX_ENVS.has(env)) return false;
+    const insert = ' \\\\\n';
+    view.dispatch({
+      changes: { from: pos, to: pos, insert },
+      selection: { anchor: pos + insert.length }
+    });
+    return true;
+  };
+}
+
+/**
+ * Shift-Enter inside matrix environments inserts & (column separator).
+ * Outside matrix environments falls through to CM6's default.
+ */
+function createShiftEnterCommand() {
+  return (view) => {
+    const state = view.state;
+    if (!state.selection.main.empty) return false;
+    const pos = state.selection.main.head;
+    const env = getCurrentEnvironment(getTextBefore(state, pos));
+    if (!env || !MATRIX_ENVS.has(env)) return false;
+    const insert = ' & ';
+    view.dispatch({
+      changes: { from: pos, to: pos, insert },
+      selection: { anchor: pos + insert.length }
+    });
+    return true;
   };
 }
 
@@ -380,6 +489,8 @@ export function createSnippetExtensions(CM) {
   const keymapDef = keymap.of([
     { key: 'Tab', run: createTabCommand(tabstopField, tabstopEffects) },
     { key: 'Shift-Tab', run: createShiftTabCommand() },
+    { key: 'Enter', run: createEnterCommand() },
+    { key: 'Shift-Enter', run: createShiftEnterCommand() },
     { key: 'Escape', run: createEscapeCommand(tabstopField, tabstopEffects) }
   ]);
 
