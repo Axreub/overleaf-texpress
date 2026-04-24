@@ -211,4 +211,41 @@ export function isInMathMode(state, pos, textBefore) {
   return detectMathModeFromText(textBefore);
 }
 
+// LaTeX commands whose braced argument holds prose, not math.
+// When the cursor sits inside one of these groups we want to suppress
+// math-mode snippet expansion even though the enclosing context is math.
+const TEXT_CMD_RE = /\\(text|textbf|textit|textrm|textsf|textsc|textsl|textup|emph|mbox)$/;
+
+/**
+ * Detect whether the cursor sits inside an unclosed \text{...}-style group.
+ *
+ * Walks backward through `textBefore` tracking brace depth. When it finds an
+ * unmatched opening brace, checks whether the tokens immediately before it
+ * form a text-mode command. Continues scanning outward through non-text
+ * groups, so nested cases like `\frac{\text{a|}}{b}` are detected correctly.
+ *
+ * @param {string} textBefore - Text before cursor
+ * @returns {boolean}
+ */
+export function isInsideTextCommand(textBefore) {
+  let depth = 0;
+  for (let i = textBefore.length - 1; i >= 0; i--) {
+    const c = textBefore[i];
+    // Skip escaped braces (\{ and \})
+    if ((c === '{' || c === '}') && i > 0 && textBefore[i - 1] === '\\') continue;
+
+    if (c === '}') {
+      depth++;
+    } else if (c === '{') {
+      if (depth === 0) {
+        if (TEXT_CMD_RE.test(textBefore.slice(0, i))) return true;
+        // Not a text command; keep walking outward through this group.
+      } else {
+        depth--;
+      }
+    }
+  }
+  return false;
+}
+
 export default isInMathMode;

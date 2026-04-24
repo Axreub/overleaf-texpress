@@ -7,7 +7,7 @@
 
 import { snippets } from './snippets.js';
 import { findMatch, matchFraction } from './matcher.js';
-import { isInMathMode, isDisplayMath } from './mathMode.js';
+import { isInMathMode, isDisplayMath, isInsideTextCommand } from './mathMode.js';
 import { processReplacement, buildFractionReplacement } from './replacement.js';
 import { createTabstopField, getCurrentTabstop, hasActiveTabstops } from './tabstops.js';
 
@@ -100,8 +100,10 @@ function createInputHandler(tabstopEffects) {
     const textBefore = existingTextBefore + text; // Include the character being typed
     const textAfter = getTextAfter(state, to);
 
-    // Detect math mode
-    const inMathMode = isInMathMode(state, pos, existingTextBefore);
+    // Detect math mode. Downgrade to text when the cursor sits inside a
+    // \text{...}-style group so math snippets don't fire inside prose.
+    const inMathMode = isInMathMode(state, pos, existingTextBefore)
+      && !isInsideTextCommand(existingTextBefore);
 
     // Auto-space after bare LaTeX commands in math mode.
     // \beta followed immediately by a letter would become \betagamma (one unknown
