@@ -7,8 +7,8 @@
 
 import { snippets } from './snippets.js';
 import { findMatch, findVisualMatch, matchFraction } from './matcher.js';
-import { isInMathMode, isDisplayMath } from './mathMode.js';
 import { processReplacement, processVisualReplacement, buildFractionReplacement } from './replacement.js';
+import { isInMathMode, isInsideTextCommand } from './mathMode.js';
 import { createTabstopField, getCurrentTabstop, hasActiveTabstops } from './tabstops.js';
 
 /**
@@ -100,8 +100,10 @@ function createInputHandler(tabstopEffects) {
     const textBefore = existingTextBefore + text; // Include the character being typed
     const textAfter = getTextAfter(state, to);
 
-    // Detect math mode
-    const inMathMode = isInMathMode(state, pos, existingTextBefore);
+    // Detect math mode. Downgrade to text when the cursor sits inside a
+    // \text{...}-style group so math snippets don't fire inside prose.
+    const inMathMode = isInMathMode(state, pos, existingTextBefore)
+      && !isInsideTextCommand(existingTextBefore);
 
     // Visual mode: text is selected — wrap the selection instead of typing.
     // Fires before all other handlers so it always takes priority.
