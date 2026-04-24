@@ -301,7 +301,6 @@
         {trigger: "lr{", replacement: "\\left\\{ $0 \\right\\} $1", options: "mA"},
         {trigger: "lr[", replacement: "\\left[ $0 \\right] $1", options: "mA"},
         {trigger: "lr|", replacement: "\\left| $0 \\right| $1", options: "mA"},
-        {trigger: "lra", replacement: "\\left< $0 \\right> $1", options: "mA"},
     
     
         // Misc
