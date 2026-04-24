@@ -20,14 +20,14 @@ const HEADER_FILE = 'userscript-header.js';
 
 async function build() {
   console.log('Building Overleaf LaTeX Shortcuts...');
-  
+
   // Ensure dist directory exists
   try {
     mkdirSync('dist', { recursive: true });
   } catch (e) {
     // Directory may already exist
   }
-  
+
   try {
     // Bundle all modules into a single IIFE
     await esbuild.build({
@@ -41,17 +41,17 @@ async function build() {
       // Don't include any external dependencies
       external: [],
     });
-    
+
     // Read the header and bundled code
     const header = readFileSync(HEADER_FILE, 'utf8');
     const bundle = readFileSync(BUNDLE_OUTPUT, 'utf8');
-    
+
     // Combine header and bundle
     const finalScript = header + '\n' + bundle;
-    
+
     // Write the final userscript
     writeFileSync(FINAL_OUTPUT, finalScript);
-    
+
     console.log(`✓ Built successfully: ${FINAL_OUTPUT}`);
     console.log(`  Size: ${(finalScript.length / 1024).toFixed(1)} KB`);
     console.log('');
@@ -59,7 +59,7 @@ async function build() {
     console.log(`  1. Copy contents of ${FINAL_OUTPUT}`);
     console.log('  2. Paste into Tampermonkey');
     console.log('  3. Refresh Overleaf');
-    
+
   } catch (error) {
     console.error('Build failed:', error);
     process.exit(1);
@@ -69,10 +69,10 @@ async function build() {
 async function watch() {
   console.log('Watching for changes...');
   console.log('Press Ctrl+C to stop\n');
-  
+
   // Initial build
   await build();
-  
+
   // Set up watch mode
   const ctx = await esbuild.context({
     entryPoints: [ENTRY_POINT],
@@ -84,16 +84,16 @@ async function watch() {
     target: ['es2020'],
     external: [],
   });
-  
+
   await ctx.watch();
-  
+
   // Also watch header file manually
   const fs = await import('fs');
   fs.watch(HEADER_FILE, async () => {
     console.log('\nHeader changed, rebuilding...');
     await build();
   });
-  
+
   // Watch for bundle changes and rebuild final output
   fs.watch(BUNDLE_OUTPUT, async () => {
     try {
