@@ -205,8 +205,8 @@ const rawSnippets = [
   { trigger: ["nabl", "del"], replacement: "\\nabla",   options: { mode: "math", auto: true } },
   { trigger: ["xx", "times"], replacement: "\\times",   options: { mode: "math", auto: true } },
   { trigger: ["**", "cdot"], replacement: "\\cdot",    options: { mode: "math", auto: true } },
-  { trigger: "otimes", replacement: "\\otimes", options: { mode: "math", auto: true } },
-  { trigger: "oplus",  replacement: "\\oplus",  options: { mode: "math", auto: true } },
+  { trigger: ["otimes", "ox"], replacement: "\\otimes", options: { mode: "math", auto: true } },
+  { trigger: ["oplus", "o+"], replacement: "\\oplus",  options: { mode: "math", auto: true } },
   { trigger: "para",   replacement: "\\parallel", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
@@ -314,8 +314,6 @@ const rawSnippets = [
   // ----------------------------------------
   { trigger: "hbar", replacement: "\\hbar", options: { mode: "math", auto: true, priority: 2 } },
   { trigger: "dag", replacement: "^{\\dagger}", options: { mode: "math", auto: true } },
-  { trigger: "o+", replacement: "\\oplus ", options: { mode: "math", auto: true } },
-  { trigger: "ox", replacement: "\\otimes ", options: { mode: "math", auto: true } },
   { trigger: "bra", replacement: "\\bra{$0} $1", options: { mode: "math", auto: true } },
   { trigger: "ket", replacement: "\\ket{$0} $1", options: { mode: "math", auto: true } },
   { trigger: "brk", replacement: "\\braket{ $0 | $1 } $2", options: { mode: "math", auto: true } },
