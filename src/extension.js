@@ -109,7 +109,7 @@ function createInputHandler(tabstopEffects) {
     // Only triggers when: in math mode, typing a single letter, and the text
     // immediately before the cursor ends with \command (backslash + letters, no {).
     if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text) &&
-        /\\[a-zA-Z]+$/.test(existingTextBefore)) {
+      /\\[a-zA-Z]+$/.test(existingTextBefore)) {
       view.dispatch({
         changes: { from, to, insert: ' ' + text },
         selection: { anchor: from + 2 }
@@ -124,7 +124,7 @@ function createInputHandler(tabstopEffects) {
     // Also consumes any duplicate closing bracket left by the auto-close snippet.
     if (inMathMode && (text === ')' || text === ']')) {
       const openChar = text === ')' ? '(' : '[';
-      const leftCmd  = text === ')' ? '\\left('  : '\\left[';
+      const leftCmd = text === ')' ? '\\left(' : '\\left[';
       const rightCmd = text === ')' ? '\\right)' : '\\right]';
 
       const openIdx = findMatchingOpen(existingTextBefore, openChar, text);
@@ -150,10 +150,10 @@ function createInputHandler(tabstopEffects) {
       if (fractionMatch) {
         const insertPos = pos - fractionMatch.matchLength + text.length;
         const { text: replacementText, cursorPos } = buildFractionReplacement(
-          fractionMatch, 
+          fractionMatch,
           insertPos
         );
-        
+
         // Dispatch the replacement transaction
         view.dispatch({
           changes: {
@@ -163,11 +163,11 @@ function createInputHandler(tabstopEffects) {
           },
           selection: { anchor: cursorPos }
         });
-        
+
         return true; // Handled - prevent default insertion
       }
     }
-    
+
     // Check for regular snippet matches
     const match = findMatch(textBefore, snippets, inMathMode, textAfter);
 
@@ -185,7 +185,7 @@ function createInputHandler(tabstopEffects) {
       const lastTriggerChar = triggerStr[triggerStr.length - 1];
 
       if ((lastTriggerChar === ')' || lastTriggerChar === ']' || lastTriggerChar === '}') &&
-          textAfter.length > 0 && textAfter[0] === lastTriggerChar) {
+        textAfter.length > 0 && textAfter[0] === lastTriggerChar) {
         // There's a duplicate closing bracket from auto-close, consume it
         replaceTo = to + 1;
       }
@@ -210,8 +210,8 @@ function createInputHandler(tabstopEffects) {
       // "\alpha ^{…}" because the space was inserted before the 'r'.
       let adjustedFrom = replaceFrom;
       if ((replacementText.startsWith('^') || replacementText.startsWith('_')) &&
-          replaceFrom > 0 &&
-          state.doc.sliceString(replaceFrom - 1, replaceFrom) === ' ') {
+        replaceFrom > 0 &&
+        state.doc.sliceString(replaceFrom - 1, replaceFrom) === ' ') {
         adjustedFrom = replaceFrom - 1;
         cursorPos -= 1;
         if (tabstops) {
@@ -240,7 +240,7 @@ function createInputHandler(tabstopEffects) {
 
       return true; // Handled
     }
-    
+
     return false; // No match, let default insertion happen
   };
 }
@@ -255,13 +255,12 @@ function createInputHandler(tabstopEffects) {
 function createTabCommand(tabstopField, tabstopEffects) {
   return (view) => {
     const state = view.state;
-    
+
     // Check for active tabstops first
     const tabstopState = state.field(tabstopField, false);
     if (tabstopState && hasActiveTabstops(tabstopState)) {
       const current = getCurrentTabstop(tabstopState);
       if (current) {
-        // Move to next tabstop
         view.dispatch({
           selection: { anchor: current.to },
           effects: [tabstopEffects.advanceEffect.of(null)]
@@ -269,16 +268,16 @@ function createTabCommand(tabstopField, tabstopEffects) {
         return true;
       }
     }
-    
-    // Fall back to bracket jumping (parentheses, square brackets, curly braces)
-    const pos = state.selection.main.head;
-    const textAfter = getTextAfter(state, pos, 1);
 
-    if (shouldJumpOverBracket(textAfter)) {
-      // Jump over closing bracket
-      view.dispatch({
-        selection: { anchor: pos + 1 }
-      });
+    // Smart forward scan: find next }, ), ] on the current line and jump past it.
+    // This lets Tab navigate through nested LaTeX structures without needing
+    // snippet-inserted tabstops.
+    const pos = state.selection.main.head;
+    const lineEnd = state.doc.lineAt(pos).to;
+    const restOfLine = state.doc.sliceString(pos, lineEnd);
+    const nextBracket = restOfLine.search(/[}\)\]]/);
+    if (nextBracket !== -1) {
+      view.dispatch({ selection: { anchor: pos + nextBracket + 1 } });
       return true;
     }
 
@@ -287,8 +286,34 @@ function createTabCommand(tabstopField, tabstopEffects) {
 }
 
 /**
+ * Create Shift-Tab handler: scan backward on the current line for the previous
+ * }, ), ] and jump to just after it — the mirror image of forward Tab scanning.
+ */
+function createShiftTabCommand() {
+  return (view) => {
+    const state = view.state;
+    const pos = state.selection.main.head;
+    const lineStart = state.doc.lineAt(pos).from;
+    const beforeCursor = state.doc.sliceString(lineStart, pos);
+
+    // Walk backward to find the last closing bracket before the cursor.
+    // Start at length-2 to skip the character immediately left of the cursor —
+    // otherwise a } right at the cursor would match itself and the cursor wouldn't move.
+    for (let i = beforeCursor.length - 2; i >= 0; i--) {
+      const ch = beforeCursor[i];
+      if (ch === '}' || ch === ')' || ch === ']') {
+        view.dispatch({ selection: { anchor: lineStart + i + 1 } });
+        return true;
+      }
+    }
+
+    return false; // No bracket found, let default Shift-Tab happen
+  };
+}
+
+/**
  * Create Escape key handler to clear tabstops
- * 
+ *
  * @param {Object} tabstopField - Tabstop StateField
  * @param {Object} tabstopEffects - Effects from tabstop field creation
  * @returns {Function} - Keymap command
@@ -297,14 +322,14 @@ function createEscapeCommand(tabstopField, tabstopEffects) {
   return (view) => {
     const state = view.state;
     const tabstopState = state.field(tabstopField, false);
-    
+
     if (tabstopState && hasActiveTabstops(tabstopState)) {
       view.dispatch({
         effects: [tabstopEffects.clearEffect.of(null)]
       });
       return true;
     }
-    
+
     return false;
   };
 }
@@ -333,6 +358,7 @@ export function createSnippetExtensions(CM) {
   // Use high precedence if available so Tab works for bracket jumping
   const keymapDef = keymap.of([
     { key: 'Tab', run: createTabCommand(tabstopField, tabstopEffects) },
+    { key: 'Shift-Tab', run: createShiftTabCommand() },
     { key: 'Escape', run: createEscapeCommand(tabstopField, tabstopEffects) }
   ]);
 

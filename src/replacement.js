@@ -83,7 +83,6 @@ export function processTabstops(template, basePos) {
   
   // Process in order of appearance
   let offset = 0;
-  let tempResult = result;
   defaultRegex.lastIndex = 0;
   
   while ((defaultMatch = defaultRegex.exec(template)) !== null) {
@@ -126,7 +125,23 @@ export function processTabstops(template, basePos) {
     }
   }
   
-  // Third pass: Remove remaining $n markers
+  // Third pass: Record plain $n tabstops (n > 0) as zero-width positions,
+  // then remove the markers. These are positions where the cursor should land
+  // when Tab is pressed, but with no default text to select.
+  {
+    const plainRegex = /\$(\d+)/g;
+    let m;
+    let off = 0;
+    while ((m = plainRegex.exec(result)) !== null) {
+      const num = parseInt(m[1], 10);
+      const pos = basePos + m.index - off;
+      if (!processedDefaults.has(num)) {
+        tabstops.push({ index: num, from: pos, to: pos });
+        processedDefaults.set(num, true);
+      }
+      off += m[0].length;
+    }
+  }
   result = result.replace(/\$(\d+)/g, '');
   
   // Sort tabstops by index
