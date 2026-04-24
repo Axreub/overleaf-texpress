@@ -204,7 +204,7 @@ const rawSnippets = [
   { trigger: "prod", replacement: "\\prod", options: { mode: "math", auto: true } },
   { trigger: "\\sum", replacement: "\\sum_{$0}^{$1} $2", options: { mode: "math", auto: false } },
   { trigger: "\\prod", replacement: "\\prod_{$0}^{$1} $2", options: { mode: "math", auto: false } },
-  { trigger: "lim", replacement: "\\lim_{ ${0:n} \\to ${1:\\infty} } $2", options: { mode: "math", auto: true } },
+  { trigger: "lim", replacement: "\\lim_{}", options: { mode: "math", auto: true } },
   { trigger: "argmin", replacement: "\\operatorname{argmin}", options: { mode: "math", auto: true } },
   { trigger: "argmax", replacement: "\\operatorname{argmax}", options: { mode: "math", auto: true } },
   { trigger: ["ber", "Ber"], replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
