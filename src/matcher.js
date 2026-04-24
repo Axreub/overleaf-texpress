@@ -140,14 +140,13 @@ export function findMatch(textBefore, snippets, inMathMode, textAfter = '') {
   
   for (const snippet of sortedSnippets) {
     // Check mode compatibility
-    if (!matchesMode(snippet, inMathMode)) {
-      continue;
-    }
-    
-    // Check if auto-expand is required
-    if (snippet.options?.auto === false) {
-      continue; // Skip non-auto snippets (require Tab)
-    }
+    if (!matchesMode(snippet, inMathMode)) continue;
+
+    // Visual snippets are handled separately (only when text is selected)
+    if (snippet.options?.visual) continue;
+
+    // Skip non-auto snippets (require Tab)
+    if (snippet.options?.auto === false) continue;
     
     // Check if should skip due to special conditions
     if (shouldSkipSnippet(snippet, textBefore, textAfter)) {
@@ -165,6 +164,25 @@ export function findMatch(textBefore, snippets, inMathMode, textAfter = '') {
     }
   }
   
+  return null;
+}
+
+/**
+ * Find a visual-mode snippet matching a single typed character while text is selected.
+ * Visual snippets must have options.visual === true.
+ *
+ * @param {string} typedChar - The single character the user typed
+ * @param {Array} snippets - Array of snippet definitions
+ * @param {boolean} inMathMode - Whether cursor is in math mode
+ * @returns {Object|null} - Matching snippet or null
+ */
+export function findVisualMatch(typedChar, snippets, inMathMode) {
+  for (const snippet of snippets) {
+    if (!snippet.options?.visual) continue;
+    if (!matchesMode(snippet, inMathMode)) continue;
+    if (typeof snippet.trigger === 'string' && snippet.trigger === typedChar) return snippet;
+    if (snippet.trigger instanceof RegExp && snippet.trigger.test(typedChar)) return snippet;
+  }
   return null;
 }
 

@@ -6,9 +6,9 @@
  */
 
 import { snippets } from './snippets.js';
-import { findMatch, matchFraction } from './matcher.js';
+import { findMatch, findVisualMatch, matchFraction } from './matcher.js';
 import { isInMathMode, isDisplayMath } from './mathMode.js';
-import { processReplacement, buildFractionReplacement } from './replacement.js';
+import { processReplacement, processVisualReplacement, buildFractionReplacement } from './replacement.js';
 import { createTabstopField, getCurrentTabstop, hasActiveTabstops } from './tabstops.js';
 
 /**
@@ -102,6 +102,29 @@ function createInputHandler(tabstopEffects) {
 
     // Detect math mode
     const inMathMode = isInMathMode(state, pos, existingTextBefore);
+
+    // Visual mode: text is selected — wrap the selection instead of typing.
+    // Fires before all other handlers so it always takes priority.
+    if (to > from && text.length === 1) {
+      const visualSnippet = findVisualMatch(text, snippets, inMathMode);
+      if (visualSnippet) {
+        const selectedText = state.doc.sliceString(from, to);
+        const processed = processVisualReplacement(visualSnippet.replacement, selectedText, from);
+        if (processed) {
+          const { text: replacementText, cursorPos, tabstops } = processed;
+          const effects = [];
+          if (tabstops && tabstops.length > 0 && tabstopEffects) {
+            effects.push(tabstopEffects.setEffect.of(tabstops));
+          }
+          view.dispatch({
+            changes: { from, to, insert: replacementText },
+            selection: { anchor: cursorPos },
+            effects
+          });
+          return true;
+        }
+      }
+    }
 
     // Auto-space after bare LaTeX commands in math mode.
     // \beta followed immediately by a letter would become \betagamma (one unknown
@@ -479,10 +502,10 @@ export function createSnippetExtensions(CM) {
 
   const tabstopEffects = { setEffect, clearEffect, advanceEffect };
 
-  // Create input handler
-  const inputHandler = EditorView.inputHandler.of(
-    createInputHandler(tabstopEffects)
-  );
+  // Create input handler — wrapped in Prec.highest so it runs before Overleaf's
+  // own inputHandler (which otherwise intercepts (, [, { before we can).
+  const rawInputHandler = EditorView.inputHandler.of(createInputHandler(tabstopEffects));
+  const inputHandler = Prec?.highest ? Prec.highest(rawInputHandler) : rawInputHandler;
 
   // Create keymap for Tab and Escape
   // Use high precedence if available so Tab works for bracket jumping

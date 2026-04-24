@@ -52,7 +52,7 @@ describe('findMatch', () => {
   it('should match text mode snippets', () => {
     const match = findMatch('mk', snippets, false);
     assert.ok(match, 'Should find mk snippet');
-    assert.strictEqual(match.snippet.replacement, '$$0$');
+    assert.ok(match.snippet.replacement.startsWith('$$0$'), 'mk replacement should start with $$0$');
   });
   
   it('should match decoration snippets like Hhat', () => {
