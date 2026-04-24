@@ -78,9 +78,9 @@ function shouldSkipSnippet(snippet, textBefore, textAfter) {
   
   // Skip snippets with unresolved variables
   const triggerStr = trigger instanceof RegExp ? trigger.source : String(trigger);
-  if (triggerStr.includes('${GREEK}') || 
-      triggerStr.includes('${SYMBOL}') || 
-      triggerStr.includes('${MORE_SYMBOLS}')) {
+  if (triggerStr.includes('{$GREEK}') || 
+      triggerStr.includes('{$SYMBOL}') || 
+      triggerStr.includes('{$MORE_SYMBOLS}')) {
     return true;
   }
   

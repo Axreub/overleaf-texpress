@@ -44,15 +44,14 @@ const GREEK_LETTERS_NORMAL = [
 const greekSnippetsHighPriority = GREEK_LETTERS_HIGH_PRIORITY.map(letter => ({
   trigger: letter,
   replacement: '\\' + letter,
-  // wordBoundary prevents "abeta" from matching "beta", etc.
-  options: { mode: "math", auto: true, priority: -1, wordBoundary: true }
+  options: { mode: "math", auto: true, priority: -1 }
 }));
 
 // Normal priority Greek letters
 const greekSnippetsNormal = GREEK_LETTERS_NORMAL.map(letter => ({
   trigger: letter,
   replacement: '\\' + letter,
-  options: { mode: "math", auto: true, priority: -2, wordBoundary: true }
+  options: { mode: "math", auto: true, priority: -2}
 }));
 
 const greekSnippets = [...greekSnippetsHighPriority, ...greekSnippetsNormal];
