@@ -1,6 +1,6 @@
-# Overleaf LaTeX Shortcuts
+# Overleaf TeXpress
 
-A userscript that adds [Latex Suite](https://github.com/artisticat1/obsidian-latex-suite)-style snippet expansion to Overleaf. Type short triggers and they automatically expand into LaTeX commands.
+A userscript that adds intuitive and fast snippet expansion to Overleaf. Type short triggers and they automatically expand into LaTeX commands.
 
 ## Installation
 
@@ -62,6 +62,7 @@ npm test
 | `@o` | `\omega` | `@O` | `\Omega` |
 | `@f` | `\phi` | `@F` | `\Phi` |
 | `@p` | `\pi` | `@P` | `\Pi` |
+| `alpha`| `\alpha`| `zeta` | |`\zeta`|
 | ... and more | | | |
 
 ### Basic Operations
@@ -133,7 +134,7 @@ Type a letter followed by the decoration name:
 | `infi` | `\int_{-\infty}^{\infty}` |
 | `sum` | `\sum_{i=1}^{N}` (with tabstops) |
 | `prod` | `\prod_{i=1}^{N}` (with tabstops) |
-| `lim` | `\lim_{n \to \infty}` (with tabstops) |
+| `lim` | `\lim_{}` (with tabstops) |
 
 ### Environments
 | Trigger | Output |
@@ -215,7 +216,3 @@ To add or modify snippets, edit the `snippets` array in the script. Each snippet
 **Conflicts with Overleaf shortcuts:**
 - Some triggers might conflict with Overleaf's built-in shortcuts
 - You can modify the trigger in the script to avoid conflicts
-
-## License
-
-MIT
