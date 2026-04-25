@@ -15,11 +15,11 @@ import { dirname } from 'path';
 
 const ENTRY_POINT = 'src/index.js';
 const BUNDLE_OUTPUT = 'dist/bundle.js';
-const FINAL_OUTPUT = 'dist/overleaf-latex-shortcuts.user.js';
+const FINAL_OUTPUT = 'dist/texpress.user.js';
 const HEADER_FILE = 'userscript-header.js';
 
 async function build() {
-  console.log('Building Overleaf LaTeX Shortcuts...');
+  console.log('Building TeXpress...');
 
   // Ensure dist directory exists
   try {

@@ -1,9 +1,9 @@
 // ==UserScript==
-// @name         Overleaf LaTeX Shortcuts
-// @namespace    https://github.com/overleaf-latex-shortcuts
+// @name         TeXpress
+// @namespace    https://github.com/texpress
 // @version      1.0.1
 // @description  Latex Suite-style snippet expansion for Overleaf
-// @author       Axel Riley
+// @author       Axel Riley, Hugo Rippe, Edvard Oxelström, Kevin Hamed
 // @match        https://www.overleaf.com/project/*
 // @grant        none
 // @run-at       document-idle

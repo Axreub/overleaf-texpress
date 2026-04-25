@@ -1,4 +1,4 @@
-# Overleaf TeXpress
+# TeXpress
 
 A userscript that adds intuitive and fast snippet expansion to Overleaf. Type short triggers and they automatically expand into LaTeX commands.
 
@@ -11,7 +11,7 @@ A userscript that adds intuitive and fast snippet expansion to Overleaf. Type sh
 
 2. Build the script (see [Building from Source](#building-from-source) below) or download a pre-built release
 
-3. Install the built script (`dist/overleaf-latex-shortcuts.user.js`) by opening it in your browser or creating a new script in Tampermonkey and pasting the contents
+3. Install the built script (`dist/texpress.user.js`) by opening it in your browser or creating a new script in Tampermonkey and pasting the contents
 
 4. Open an Overleaf project and start typing!
 
@@ -21,13 +21,13 @@ A userscript that adds intuitive and fast snippet expansion to Overleaf. Type sh
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/overleaf-texpress.git
-cd overleaf-texpress
+git clone https://github.com/yourusername/texpress.git
+cd texpress
 
 # Install dependencies
 npm install
 
-# Build the userscript (output: dist/overleaf-texpress.user.js)
+# Build the userscript (output: dist/texpress.user.js)
 npm run build
 
 # Or watch for changes during development
