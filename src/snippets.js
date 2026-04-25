@@ -1,6 +1,9 @@
 /**
  * Snippet Definitions for Overleaf LaTeX Shortcuts
- *
+ * 
+ * This file contains snippet definitions that largely overlap with
+ * Those of the Obsidian LaTeX Suite: https://github.com/artisticat1/obsidian-latex-suite
+ * Big thanks to artisticat1 for providing a lot of this and for sharing it with an MIT license!
  * Options:
  *   mode: "math" | "text" | "any" - when the snippet should trigger
  *   auto: boolean - auto-expand without Tab (default: true for most)

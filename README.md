@@ -21,13 +21,13 @@ A userscript that adds intuitive and fast snippet expansion to Overleaf. Type sh
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/overleaf-latex-shortcuts.git
-cd overleaf-latex-shortcuts
+git clone https://github.com/yourusername/overleaf-texpress.git
+cd overleaf-texpress
 
 # Install dependencies
 npm install
 
-# Build the userscript (output: dist/overleaf-latex-shortcuts.user.js)
+# Build the userscript (output: dist/overleaf-texpress.user.js)
 npm run build
 
 # Or watch for changes during development
@@ -216,3 +216,10 @@ To add or modify snippets, edit the `snippets` array in the script. Each snippet
 **Conflicts with Overleaf shortcuts:**
 - Some triggers might conflict with Overleaf's built-in shortcuts
 - You can modify the trigger in the script to avoid conflicts
+
+
+
+
+## License
+
+MIT; copyright partially provided to artisticat1 for many of the snippets
