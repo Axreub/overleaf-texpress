@@ -222,6 +222,7 @@ const rawSnippets = [
   { trigger: ["otimes", "ox"], replacement: "\\otimes $0", options: { mode: "math", auto: true } },
   { trigger: ["oplus", "o+"], replacement: "\\oplus $0", options: { mode: "math", auto: true } },
   { trigger: "para", replacement: "\\parallel $0", options: { mode: "math", auto: true } },
+  { trigger: "KL", replacement: "\\operatorname{KL}", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Relations
