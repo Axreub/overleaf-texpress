@@ -62,7 +62,7 @@ npm test
 | `@o` | `\omega` | `@O` | `\Omega` |
 | `@f` | `\phi` | `@F` | `\Phi` |
 | `@p` | `\pi` | `@P` | `\Pi` |
-| `alpha` | `\alpha` | `zeta` | |`\zeta`|
+| `alpha` | `\alpha` | `zeta` |`\zeta`|
 | ... and more | | | |
 
 ### Basic Operations
