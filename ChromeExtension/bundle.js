@@ -1,14 +1,3 @@
-// ==UserScript==
-// @name         Overleaf LaTeX Shortcuts
-// @namespace    https://github.com/overleaf-latex-shortcuts
-// @version      2.0.0
-// @description  Latex Suite-style snippet expansion for Overleaf (CodeMirror 6 native)
-// @author       Axel Riley, Hugo Rippe, Edvard Oxelström, Kevin Hamed
-// @match        https://www.overleaf.com/project/*
-// @grant        none
-// @run-at       document-idle
-// ==/UserScript==
-
 (() => {
   var __defProp = Object.defineProperty;
   var __getOwnPropNames = Object.getOwnPropertyNames;
@@ -185,7 +174,7 @@
         // Auto letter subscript: x2 -> x_{2}
         { trigger: /([A-Za-z])(\d)/, replacement: "[[0]]_{[[1]]}", options: { mode: "math", auto: true, priority: -1 } },
         // Functions with backslash
-        { trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]", options: { mode: "math", auto: true } },
+        { trigger: /([^\\])(exp|log|ln)/, replacement: "[[0]]\\[[1]]($0)", options: { mode: "math", auto: true } },
         { trigger: "conj", replacement: "^{*}", options: { mode: "math", auto: true } },
         { trigger: "Re", replacement: "\\mathrm{Re}", options: { mode: "math", auto: true } },
         { trigger: "Im", replacement: "\\mathrm{Im}", options: { mode: "math", auto: true } },
@@ -244,7 +233,7 @@
         { trigger: "prod", replacement: "\\prod", options: { mode: "math", auto: true } },
         { trigger: "\\sum", replacement: "\\sum_{$0}^{$1} $2", options: { mode: "math", auto: false } },
         { trigger: "\\prod", replacement: "\\prod_{$0}^{$1} $2", options: { mode: "math", auto: false } },
-        { trigger: "lim", replacement: "\\lim_{ ${0:n} \\to ${1:\\infty} } $2", options: { mode: "math", auto: true } },
+        { trigger: "lim", replacement: "\\lim_{}", options: { mode: "math", auto: true } },
         { trigger: "argmin", replacement: "\\operatorname{argmin}", options: { mode: "math", auto: true } },
         { trigger: "argmax", replacement: "\\operatorname{argmax}", options: { mode: "math", auto: true } },
         { trigger: ["ber", "Ber"], replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
@@ -252,13 +241,13 @@
         { trigger: "Cov", replacement: "\\operatorname{Cov}", options: { mode: "math", auto: true } },
         { trigger: "+-", replacement: "\\pm", options: { mode: "math", auto: true } },
         { trigger: "-+", replacement: "\\mp", options: { mode: "math", auto: true } },
-        { trigger: "...", replacement: "\\dots", options: { mode: "math", auto: true } },
+        { trigger: "...", replacement: "\\dots $0", options: { mode: "math", auto: true } },
         { trigger: ["nabl", "del"], replacement: "\\nabla", options: { mode: "math", auto: true } },
-        { trigger: ["xx", "times"], replacement: "\\times", options: { mode: "math", auto: true } },
-        { trigger: ["**", "cdot"], replacement: "\\cdot", options: { mode: "math", auto: true } },
-        { trigger: ["otimes", "ox"], replacement: "\\otimes", options: { mode: "math", auto: true } },
-        { trigger: ["oplus", "o+"], replacement: "\\oplus", options: { mode: "math", auto: true } },
-        { trigger: "para", replacement: "\\parallel", options: { mode: "math", auto: true } },
+        { trigger: ["xx", "times"], replacement: "\\times $0", options: { mode: "math", auto: true } },
+        { trigger: ["**", "cdot"], replacement: "\\cdot $0", options: { mode: "math", auto: true } },
+        { trigger: ["otimes", "ox"], replacement: "\\otimes $0", options: { mode: "math", auto: true } },
+        { trigger: ["oplus", "o+"], replacement: "\\oplus $0", options: { mode: "math", auto: true } },
+        { trigger: "para", replacement: "\\parallel $0", options: { mode: "math", auto: true } },
         // ----------------------------------------
         // Relations
         // ----------------------------------------
@@ -336,8 +325,7 @@
         },
         {
           trigger: /\\(arcsin|sin|arccos|cos|arctan|tan|csc|sec|cot)([A-Za-gi-z])/,
-          replacement: "\\[[0]] [[1]]",
-          options: { mode: "math", auto: true }
+          replacement: "\\[[0]] [[1]]"
         },
         {
           trigger: /\\(sinh|cosh|tanh|coth)([A-Za-z])/,
@@ -379,6 +367,30 @@
         { trigger: "matrix", replacement: "\\begin{matrix}\n$0\n\\end{matrix}", options: { mode: "math", auto: true } },
         { trigger: "cases", replacement: "\\begin{cases}\n$0\n\\end{cases}", options: { mode: "math", auto: true } },
         { trigger: "array", replacement: "\\begin{array}\n$0\n\\end{array}", options: { mode: "math", auto: true } },
+        // ----------------------------------------
+        // Visual Mode (select text, then press trigger key)
+        // [[VISUAL]] in string replacements is substituted with the selected text.
+        // Function replacements receive ([selectedText]) and return a string template.
+        // ----------------------------------------
+        // Detects tall symbols that need \left/\right sizing (same set as extension.js)
+        // defined here to avoid a circular import with extension.js
+        .../* @__PURE__ */ (() => {
+          const TALL_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
+          const tall = (v) => TALL_RE.test(v);
+          return [
+            { trigger: "/", replacement: "\\frac{[[VISUAL]]}{$0}$1", options: { mode: "math", visual: true } },
+            { trigger: "(", replacement: ([v]) => tall(v) ? `\\left(${v}\\right)$0` : `(${v})$0`, options: { mode: "math", visual: true } },
+            { trigger: "[", replacement: ([v]) => tall(v) ? `\\left[${v}\\right]$0` : `[${v}]$0`, options: { mode: "math", visual: true } },
+            { trigger: "{", replacement: ([v]) => tall(v) ? `\\left\\{${v}\\right\\}$0` : `\\{${v}\\}$0`, options: { mode: "math", visual: true } },
+            { trigger: "|", replacement: ([v]) => tall(v) ? `\\left|${v}\\right|$0` : `|${v}|$0`, options: { mode: "math", visual: true } }
+          ];
+        })(),
+        { trigger: "U", replacement: "\\underbrace{ [[VISUAL]] }_{ $0 }", options: { mode: "math", visual: true } },
+        { trigger: "O", replacement: "\\overbrace{ [[VISUAL]] }^{ $0 }", options: { mode: "math", visual: true } },
+        { trigger: "B", replacement: "\\underset{ $0 }{ [[VISUAL]] }", options: { mode: "math", visual: true } },
+        { trigger: "C", replacement: "\\cancel{ [[VISUAL]] }", options: { mode: "math", visual: true } },
+        { trigger: "K", replacement: "\\cancelto{ $0 }{ [[VISUAL]] }", options: { mode: "math", visual: true } },
+        { trigger: "S", replacement: "\\sqrt{ [[VISUAL]] }", options: { mode: "math", visual: true } },
         // ----------------------------------------
         // Brackets
         // ----------------------------------------
@@ -439,6 +451,7 @@ ${output}
   __export(matcher_exports, {
     default: () => matcher_default,
     findMatch: () => findMatch,
+    findVisualMatch: () => findVisualMatch,
     matchFraction: () => matchFraction
   });
   function matchesMode(snippet, inMathMode) {
@@ -520,12 +533,12 @@ ${output}
       return lenB - lenA;
     });
     for (const snippet of sortedSnippets) {
-      if (!matchesMode(snippet, inMathMode)) {
+      if (!matchesMode(snippet, inMathMode))
         continue;
-      }
-      if (snippet.options?.auto === false) {
+      if (snippet.options?.visual)
         continue;
-      }
+      if (snippet.options?.auto === false)
+        continue;
       if (shouldSkipSnippet(snippet, textBefore, textAfter)) {
         continue;
       }
@@ -537,6 +550,19 @@ ${output}
           captures: match.captures
         };
       }
+    }
+    return null;
+  }
+  function findVisualMatch(typedChar, snippets2, inMathMode) {
+    for (const snippet of snippets2) {
+      if (!snippet.options?.visual)
+        continue;
+      if (!matchesMode(snippet, inMathMode))
+        continue;
+      if (typeof snippet.trigger === "string" && snippet.trigger === typedChar)
+        return snippet;
+      if (snippet.trigger instanceof RegExp && snippet.trigger.test(typedChar))
+        return snippet;
     }
     return null;
   }
@@ -650,6 +676,7 @@ ${output}
     return { token: null, consumed: 0, singleChar: false };
   }
   function findMatchingOpenParen(s, closePos, parenType) {
+    let rightParen, leftParen;
     if (parenType === "regular") {
       rightParen = ")";
       leftParen = "(";
@@ -686,7 +713,8 @@ ${output}
     detectMathModeFromText: () => detectMathModeFromText,
     detectMathModeFromTree: () => detectMathModeFromTree,
     isDisplayMath: () => isDisplayMath,
-    isInMathMode: () => isInMathMode
+    isInMathMode: () => isInMathMode,
+    isInsideTextCommand: () => isInsideTextCommand
   });
   function isMathNode(nodeName) {
     const mathNodeNames = [
@@ -822,9 +850,29 @@ ${output}
     }
     return detectMathModeFromText(textBefore);
   }
-  var mathMode_default;
+  function isInsideTextCommand(textBefore) {
+    let depth = 0;
+    for (let i = textBefore.length - 1; i >= 0; i--) {
+      const c = textBefore[i];
+      if ((c === "{" || c === "}") && i > 0 && textBefore[i - 1] === "\\")
+        continue;
+      if (c === "}") {
+        depth++;
+      } else if (c === "{") {
+        if (depth === 0) {
+          if (TEXT_CMD_RE.test(textBefore.slice(0, i)))
+            return true;
+        } else {
+          depth--;
+        }
+      }
+    }
+    return false;
+  }
+  var TEXT_CMD_RE, mathMode_default;
   var init_mathMode = __esm({
     "src/mathMode.js"() {
+      TEXT_CMD_RE = /\\(text|textbf|textit|textrm|textsf|textsc|textsl|textup|emph|mbox)$/;
       mathMode_default = isInMathMode;
     }
   });
@@ -832,7 +880,6 @@ ${output}
   // src/extension.js
   init_snippets();
   init_matcher();
-  init_mathMode();
 
   // src/replacement.js
   function applyCaptures(template, captures) {
@@ -920,12 +967,19 @@ ${output}
       tabstops
     };
   }
+  function processVisualReplacement(replacement, selectedText, insertPos) {
+    const template = typeof replacement === "function" ? replacement([selectedText]) : replacement.replace(/\[\[VISUAL\]\]/g, selectedText);
+    return processTabstops(template, insertPos);
+  }
   function buildFractionReplacement(fractionMatch, insertPos) {
     const { numerator } = fractionMatch;
     const text = `\\frac{${numerator}}{}`;
     const cursorPos = insertPos + text.length - 1;
     return { text, cursorPos };
   }
+
+  // src/extension.js
+  init_mathMode();
 
   // src/tabstops.js
   function createTabstopState() {
@@ -1024,6 +1078,9 @@ ${output}
     const end = Math.min(state.doc.length, pos + maxLength);
     return state.doc.sliceString(pos, end);
   }
+  var knownCommands = new Set(
+    snippets.map((s) => typeof s.replacement === "string" ? s.replacement.match(/^\\([a-zA-Z]+)/) : null).filter(Boolean).map((m) => m[1])
+  );
   var TALL_CONTENT_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
   function findMatchingOpen(text, openChar, closeChar) {
     let depth = 0;
@@ -1048,13 +1105,36 @@ ${output}
       const existingTextBefore = getTextBefore(state, pos);
       const textBefore = existingTextBefore + text;
       const textAfter = getTextAfter(state, to);
-      const inMathMode = isInMathMode(state, pos, existingTextBefore);
-      if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text) && /\\[a-zA-Z]+$/.test(existingTextBefore)) {
-        view.dispatch({
-          changes: { from, to, insert: " " + text },
-          selection: { anchor: from + 2 }
-        });
-        return true;
+      const inMathMode = isInMathMode(state, pos, existingTextBefore) && !isInsideTextCommand(existingTextBefore);
+      if (to > from && text.length === 1) {
+        const visualSnippet = findVisualMatch(text, snippets, inMathMode);
+        if (visualSnippet) {
+          const selectedText = state.doc.sliceString(from, to);
+          const processed = processVisualReplacement(visualSnippet.replacement, selectedText, from);
+          if (processed) {
+            const { text: replacementText, cursorPos, tabstops } = processed;
+            const effects = [];
+            if (tabstops && tabstops.length > 0 && tabstopEffects) {
+              effects.push(tabstopEffects.setEffect.of(tabstops));
+            }
+            view.dispatch({
+              changes: { from, to, insert: replacementText },
+              selection: { anchor: cursorPos },
+              effects
+            });
+            return true;
+          }
+        }
+      }
+      if (inMathMode && text.length === 1 && /[a-zA-Z]/.test(text)) {
+        const cmdMatch = existingTextBefore.match(/\\([a-zA-Z]+)$/);
+        if (cmdMatch && knownCommands.has(cmdMatch[1])) {
+          view.dispatch({
+            changes: { from, to, insert: " " + text },
+            selection: { anchor: from + 2 }
+          });
+          return true;
+        }
       }
       if (inMathMode && (text === ")" || text === "]")) {
         const openChar = text === ")" ? "(" : "[";
@@ -1316,9 +1396,8 @@ ${output}
     const tabstopConfig = createTabstopField(StateField, StateEffect);
     const { field: tabstopField, setEffect, clearEffect, advanceEffect } = tabstopConfig;
     const tabstopEffects = { setEffect, clearEffect, advanceEffect };
-    const inputHandler = EditorView.inputHandler.of(
-      createInputHandler(tabstopEffects)
-    );
+    const rawInputHandler = EditorView.inputHandler.of(createInputHandler(tabstopEffects));
+    const inputHandler = Prec?.highest ? Prec.highest(rawInputHandler) : rawInputHandler;
     const keymapDef = keymap.of([
       { key: "Tab", run: createTabCommand(tabstopField, tabstopEffects) },
       { key: "Shift-Tab", run: createShiftTabCommand() },

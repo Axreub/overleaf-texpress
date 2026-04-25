@@ -1,0 +1,18 @@
+{
+    "manifest_version": 3,
+    "name": "Overleaf LaTeX Shortcuts",
+    "description": "A service that allows you to write text in LaTeX using shortcuts and navigate between placeholders using tabstops.",
+    "version": "1.0.0",
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.overleaf.com/project/*"
+            ],
+            "js": [
+                "bundle.js"
+            ],
+            "run_at": "document_idle",
+            "world": "MAIN"
+        }
+    ]
+}
