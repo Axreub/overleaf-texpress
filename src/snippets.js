@@ -286,6 +286,7 @@ const rawSnippets = [
   { trigger: "par", replacement: "\\frac{ \\partial ${0:y} }{ \\partial ${1:x} } $2", options: { mode: "math", auto: false } },
   { trigger: /pa([A-Za-z])([A-Za-z])/, replacement: "\\frac{ \\partial [[0]] }{ \\partial [[1]] } ", options: { mode: "math", auto: false } },
   { trigger: "ddt", replacement: "\\frac{d}{dt} ", options: { mode: "math", auto: true } },
+  { trigger: "ddx", replacement: "\\frac{d}{dx} ", options: { mode: "math", auto: true } },
 
   { trigger: /([^\\])int/, replacement: "[[0]]\\int", options: { mode: "math", auto: true, priority: -1 } },
   { trigger: "\\int", replacement: "\\int $0 \\, d${1:x} $2", options: { mode: "math", auto: false } },
