@@ -289,7 +289,10 @@ const rawSnippets = [
 
   { trigger: /([^\\])int/, replacement: "[[0]]\\int", options: { mode: "math", auto: true, priority: -1 } },
   { trigger: "\\int", replacement: "\\int $0 \\, d${1:x} $2", options: { mode: "math", auto: false } },
-  { trigger: "dint", replacement: "\\int_{${0:0}}^{${1:1}} $2 \\, d${3:x} $4", options: { mode: "math", auto: true } },
+  { 
+      trigger: "dint", replacement: "\\int_{${1:0}}^{${2:1}} $0 \\, d${3:x}", 
+      options: { mode: "math", auto: true } 
+  },
   { trigger: "oint", replacement: "\\oint", options: { mode: "math", auto: true } },
   { trigger: "iint", replacement: "\\iint", options: { mode: "math", auto: true } },
   { trigger: "iiint", replacement: "\\iiint", options: { mode: "math", auto: true } },
