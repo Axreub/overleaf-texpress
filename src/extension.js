@@ -10,6 +10,36 @@ import { findMatch, findVisualMatch, matchFraction } from './matcher.js';
 import { processReplacement, processVisualReplacement, buildFractionReplacement } from './replacement.js';
 import { isInMathMode, isInsideTextCommand } from './mathMode.js';
 import { createTabstopField, getCurrentTabstop, hasActiveTabstops } from './tabstops.js';
+import {
+  upgradeAllEnclosingDelims,
+  singleReplaceDiff,
+  containsTallOp,
+  completeRightForPlainClose,
+  mapIndexAcrossDelimiterExpand
+} from './tallDelimiters.js';
+
+export { TALL_CONTENT_RE } from './tallDelimiters.js';
+
+/**
+ * Merge CodeMirror's isolateHistory annotation so undo does not merge typing with expansion.
+ * Uses "before" so this transaction is not joined with prior input in the same undo group.
+ * (Transaction.addToHistory.of(false) omits a change from history entirely — wrong for snippets.)
+ * @param { { of?: (v: 'before' | 'after' | 'full') => unknown } | null | undefined } isolateHistory
+ * @param {Record<string, unknown>} spec - TransactionSpec
+ */
+function dispatchExpansion(view, spec, isolateHistory) {
+  if (!isolateHistory || typeof isolateHistory.of !== 'function') {
+    view.dispatch(spec);
+    return;
+  }
+  const mark = isolateHistory.of('before');
+  const prev = spec.annotations;
+  let annotations;
+  if (prev === undefined) annotations = mark;
+  else if (Array.isArray(prev)) annotations = [...prev, mark];
+  else annotations = [prev, mark];
+  view.dispatch({ ...spec, annotations });
+}
 
 /**
  * Get text before cursor position from editor state
@@ -50,9 +80,6 @@ const knownCommands = new Set(
     .map(m => m[1])
 );
 
-// LaTeX commands whose presence inside brackets means the brackets need \left/\right sizing
-export const TALL_CONTENT_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
-
 /**
  * Scan backward through text to find the opening bracket that matches
  * a closing bracket typed at the end.  Returns the index of the opening
@@ -89,12 +116,87 @@ export function shouldJumpOverBracket(textAfter) {
 }
 
 /**
+ * Build primary edit + nested \left/\right upgrades as one minimal document replace.
+ * @param tabstopEffects - optional; tabstops are mapped when delimiter upgrades run.
+ */
+function dispatchWithDelimiterUpgrade(
+  view,
+  state,
+  replaceFrom,
+  replaceTo,
+  replacementText,
+  cursorPos,
+  tabstopEffects,
+  tabstops,
+  isolateHistory
+) {
+  const orig = state.doc.sliceString(0, state.doc.length);
+  const tentative = orig.slice(0, replaceFrom) + replacementText + orig.slice(replaceTo);
+  const winLo = Math.max(0, cursorPos - 320);
+  const winHi = Math.min(tentative.length, cursorPos + 320);
+
+  const effects = [];
+  const addTabstops = (ts) => {
+    if (ts && ts.length > 0 && tabstopEffects) {
+      effects.push(tabstopEffects.setEffect.of(ts));
+    }
+  };
+
+  if (!containsTallOp(tentative.slice(winLo, winHi))) {
+    addTabstops(tabstops);
+    dispatchExpansion(
+      view,
+      {
+        changes: { from: replaceFrom, to: replaceTo, insert: replacementText },
+        selection: { anchor: cursorPos },
+        effects
+      },
+      isolateHistory
+    );
+    return;
+  }
+  const { text: finalDoc, focus } = upgradeAllEnclosingDelims(tentative, cursorPos);
+  const diff = singleReplaceDiff(orig, finalDoc);
+  if (!diff) {
+    addTabstops(tabstops);
+    dispatchExpansion(
+      view,
+      {
+        changes: { from: replaceFrom, to: replaceTo, insert: replacementText },
+        selection: { anchor: cursorPos },
+        effects
+      },
+      isolateHistory
+    );
+    return;
+  }
+  let mappedTabstops = tabstops;
+  if (tabstops && tabstops.length > 0 && tentative !== finalDoc) {
+    mappedTabstops = tabstops.map(ts => ({
+      index: ts.index,
+      from: mapIndexAcrossDelimiterExpand(tentative, finalDoc, ts.from),
+      to: mapIndexAcrossDelimiterExpand(tentative, finalDoc, ts.to)
+    }));
+  }
+  addTabstops(mappedTabstops);
+  dispatchExpansion(
+    view,
+    {
+      changes: { from: diff.from, to: diff.to, insert: diff.insert },
+      selection: { anchor: focus },
+      effects
+    },
+    isolateHistory
+  );
+}
+
+/**
  * Create the snippet expansion input handler
  *
  * @param {Object} tabstopEffects - Effects from tabstop field creation
  * @returns {Function} - CM6 inputHandler function
  */
-function createInputHandler(tabstopEffects) {
+function createInputHandler(tabstopEffects, isolateHistory) {
   return (view, from, to, text) => {
     // Only handle single character insertions for auto-expand
     // This prevents issues with paste, etc.
@@ -128,11 +230,15 @@ function createInputHandler(tabstopEffects) {
           if (tabstops && tabstops.length > 0 && tabstopEffects) {
             effects.push(tabstopEffects.setEffect.of(tabstops));
           }
-          view.dispatch({
-            changes: { from, to, insert: replacementText },
-            selection: { anchor: cursorPos },
-            effects
-          });
+          dispatchExpansion(
+            view,
+            {
+              changes: { from, to, insert: replacementText },
+              selection: { anchor: cursorPos },
+              effects
+            },
+            isolateHistory
+          );
           return true;
         }
       }
@@ -154,30 +260,25 @@ function createInputHandler(tabstopEffects) {
       }
     }
 
-    // Auto-size brackets: when ) or ] is typed in math mode, scan back for the
-    // matching open bracket and check whether the enclosed content contains a
-    // tall operator (frac, sum, int, …).  If so, wrap with \left/\right.
-    // Handles arbitrary content — (\sum_{i=1}^N a_i) works just as well as (\sum).
-    // Also consumes any duplicate closing bracket left by the auto-close snippet.
-    if (inMathMode && (text === ')' || text === ']')) {
-      const openChar = text === ')' ? '(' : '[';
-      const leftCmd = text === ')' ? '\\left(' : '\\left[';
-      const rightCmd = text === ')' ? '\\right)' : '\\right]';
-
-      const openIdx = findMatchingOpen(existingTextBefore, openChar, text);
-      if (openIdx >= 0) {
-        const content = existingTextBefore.slice(openIdx + 1);
-        if (TALL_CONTENT_RE.test(content)) {
-          const docOpenPos = pos - existingTextBefore.length + openIdx;
-          // Consume the duplicate closing bracket inserted by auto-close, if present
-          const replaceTo = (textAfter.length > 0 && textAfter[0] === text) ? to + 1 : to;
-          const replacement = leftCmd + content + rightCmd;
-          view.dispatch({
-            changes: { from: docOpenPos, to: replaceTo, insert: replacement },
-            selection: { anchor: docOpenPos + replacement.length }
-          });
-          return true;
+    // Complete \right when the matching opener is already \left (e.g. only open was upgraded).
+    if (inMathMode && (text === ')' || text === ']' || text === '}')) {
+      const simulated = existingTextBefore + text;
+      const closeIdx = simulated.length - 1;
+      const rightInsert = completeRightForPlainClose(simulated, closeIdx);
+      if (rightInsert) {
+        let replaceTo = to;
+        if (textAfter.length > 0 && textAfter[0] === text) {
+          replaceTo = to + 1;
         }
+        dispatchExpansion(
+          view,
+          {
+            changes: { from: pos, to: replaceTo, insert: rightInsert },
+            selection: { anchor: pos + rightInsert.length }
+          },
+          isolateHistory
+        );
+        return true;
       }
     }
 
@@ -191,16 +292,18 @@ function createInputHandler(tabstopEffects) {
           insertPos
         );
 
-        // Dispatch the replacement transaction
-        view.dispatch({
-          changes: {
-            from: pos - fractionMatch.matchLength + text.length,
-            to: to,
-            insert: replacementText
-          },
-          selection: { anchor: cursorPos }
-        });
-
+        const fFrom = pos - fractionMatch.matchLength + text.length;
+        dispatchWithDelimiterUpgrade(
+          view,
+          state,
+          fFrom,
+          to,
+          replacementText,
+          cursorPos,
+          null,
+          null,
+          isolateHistory
+        );
         return true; // Handled - prevent default insertion
       }
     }
@@ -256,24 +359,17 @@ function createInputHandler(tabstopEffects) {
         }
       }
 
-      // Build the transaction
-      const effects = [];
-
-      // Set tabstops if any
-      if (tabstops && tabstops.length > 0 && tabstopEffects) {
-        effects.push(tabstopEffects.setEffect.of(tabstops));
-      }
-
-      // Dispatch the replacement
-      view.dispatch({
-        changes: {
-          from: adjustedFrom,
-          to: replaceTo,
-          insert: replacementText
-        },
-        selection: { anchor: cursorPos },
-        effects
-      });
+      dispatchWithDelimiterUpgrade(
+        view,
+        state,
+        adjustedFrom,
+        replaceTo,
+        replacementText,
+        cursorPos,
+        tabstopEffects,
+        tabstops || [],
+        isolateHistory
+      );
 
       return true; // Handled
     }
@@ -508,7 +604,12 @@ function createEscapeCommand(tabstopField, tabstopEffects) {
  * @returns {Array} - Array of CM6 extensions
  */
 export function createSnippetExtensions(CM) {
-  const { EditorView, StateField, StateEffect, keymap, Prec } = CM;
+  const { EditorView, StateField, StateEffect, keymap, Prec, isolateHistory } = CM;
+  if (!isolateHistory && typeof console !== 'undefined' && console.debug) {
+    console.debug(
+      'Overleaf LaTeX Shortcuts: isolateHistory not found; undo may merge typing with snippet expansion.'
+    );
+  }
 
   // Create tabstop state management
   const tabstopConfig = createTabstopField(StateField, StateEffect);
@@ -518,7 +619,9 @@ export function createSnippetExtensions(CM) {
 
   // Create input handler — wrapped in Prec.highest so it runs before Overleaf's
   // own inputHandler (which otherwise intercepts (, [, { before we can).
-  const rawInputHandler = EditorView.inputHandler.of(createInputHandler(tabstopEffects));
+  const rawInputHandler = EditorView.inputHandler.of(
+    createInputHandler(tabstopEffects, isolateHistory)
+  );
   const inputHandler = Prec?.highest ? Prec.highest(rawInputHandler) : rawInputHandler;
 
   // Create keymap for Tab and Escape

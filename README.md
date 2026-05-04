@@ -5,15 +5,11 @@ A userscript that adds intuitive and fast snippet expansion to Overleaf. Type sh
 ## Installation
 
 1. Install a userscript manager:
-   - **Chrome/Edge**: [Tampermonkey](https://www.tampermonkey.net/)
-   - **Firefox**: [Greasemonkey](https://addons.mozilla.org/en-US/firefox/addon/greasemonkey/) or [Tampermonkey](https://www.tampermonkey.net/)
-   - **Safari**: [Userscripts](https://apps.apple.com/us/app/userscripts/id1463298887)
+   - **Chrome**: [Chrome Extension](https://chromewebstore.google.com/detail/texpress/pakaijpkhgcoccbeeplgcanpjnohjade)
+   - **Firefox**: [Addon](https://addons.mozilla.org/en-US/firefox/addon/insert-here)
 
-2. Build the script (see [Building from Source](#building-from-source) below) or download a pre-built release
 
-3. Install the built script (`dist/texpress.user.js`) by opening it in your browser or creating a new script in Tampermonkey and pasting the contents
-
-4. Open an Overleaf project and start typing!
+2. Open an Overleaf project and start typing!
 
 ## Building from Source
 
@@ -61,8 +57,8 @@ npm test
 | `@s` | `\sigma` | `@S` | `\Sigma` |
 | `@o` | `\omega` | `@O` | `\Omega` |
 | `@f` | `\phi` | `@F` | `\Phi` |
-| `@p` | `\pi` | `@P` | `\Pi` |
 | `alpha` | `\alpha` | `zeta` |`\zeta`|
+| `Lambda` | `\Lambda` | `Gamma` | `\Gamma` |
 | ... and more | | | |
 
 ### Basic Operations
@@ -119,10 +115,10 @@ Type a letter followed by the decoration name:
 | `QQ` | `\mathbb{Q}` | `FF` | `\mathbb{F}` |
 | `LL` | `\mathcal{L}` | `HH` | `\mathcal{H}` |
 
+
 ### Calculus
 | Trigger | Output |
 |---------|--------|
-| `par` | `\frac{\partial y}{\partial x}` (with tabstops) |
 | `paxy` | `\frac{\partial x}{\partial y}` (regex: any two letters) |
 | `ddt` | `\frac{d}{dt}` |
 | `ddx` | `\frac{d}{dx}` |
@@ -184,38 +180,9 @@ Type a letter followed by the decoration name:
 Many snippets include tabstops for quick editing:
 - After a snippet expands, your cursor is placed at the first tabstop
 - Press **Tab** to jump to the next tabstop
+- Press **Shift + Tab** to jump to the previous tabstop
 - Press **Escape** to exit tabstop mode
 - Tabstops with defaults (like `${0:x}`) will select the default text
-
-Example with `sum`:
-1. Type `sum` → expands to `\sum_{i=1}^{N}`
-2. Cursor is on `i` (first tabstop)
-3. Press Tab → cursor moves to `1`
-4. Press Tab → cursor moves to `N`
-5. Press Tab → cursor moves after the snippet
-
-## Customization
-
-To add or modify snippets, edit the `snippets` array in the script. Each snippet has:
-- `trigger`: The text or regex to match
-- `replacement`: The LaTeX to insert (use `$0`, `$1` for tabstops, `${0:default}` for defaults)
-- `options`: Combination of:
-  - `m` = math mode only
-  - `t` = text mode only
-  - `A` = auto-expand (no Tab needed)
-  - `r` = regex trigger
-  - `w` = word boundary required
-
-## Troubleshooting
-
-**Snippets not expanding:**
-- Make sure you're in math mode for math-only snippets (inside `$...$` or math environments)
-- Check the browser console for errors
-- Try refreshing the page
-
-**Conflicts with Overleaf shortcuts:**
-- Some triggers might conflict with Overleaf's built-in shortcuts
-- You can modify the trigger in the script to avoid conflicts
 
 
 

@@ -14,6 +14,8 @@
  * Array triggers are expanded into separate snippet entries automatically.
  */
 
+import { containsTallOp } from './tallDelimiters.js';
+
 function expandTriggers(snippetList) {
   const result = [];
   for (const snippet of snippetList) {
@@ -112,8 +114,7 @@ const rawSnippets = [
   { trigger: "@U", replacement: "\\Upsilon", options: { mode: "math", auto: true } },
   { trigger: ["@o", "ome"], replacement: "\\omega", options: { mode: "math", auto: true } },
   { trigger: ["@O", "Ome"], replacement: "\\Omega", options: { mode: "math", auto: true } },
-  { trigger: "@p", replacement: "\\partial", options: { mode: "math", auto: true } },
-
+  { trigger: ["@p", "par"], replacement: "\\partial", options: { mode: "math", auto: true } },
   // Variant forms
   { trigger: "vareps", replacement: "\\varepsilon", options: { mode: "math", auto: true, priority: -1 } },
   { trigger: "varphi", replacement: "\\varphi", options: { mode: "math", auto: true, priority: -1 } },
@@ -205,9 +206,7 @@ const rawSnippets = [
   { trigger: ["ooo", "infty", "nfty"], replacement: "\\infty", options: { mode: "math", auto: true } },
   { trigger: "sum", replacement: "\\sum", options: { mode: "math", auto: true } },
   { trigger: "prod", replacement: "\\prod", options: { mode: "math", auto: true } },
-  { trigger: "\\sum", replacement: "\\sum_{$0}^{$1} $2", options: { mode: "math", auto: false } },
-  { trigger: "\\prod", replacement: "\\prod_{$0}^{$1} $2", options: { mode: "math", auto: false } },
-  { trigger: "lim", replacement: "\\lim_{}", options: { mode: "math", auto: true } },
+  { trigger: "lim", replacement: "\\lim_{$0}", options: { mode: "math", auto: true } },
   { trigger: "argmin", replacement: "\\operatorname{argmin}", options: { mode: "math", auto: true } },
   { trigger: "argmax", replacement: "\\operatorname{argmax}", options: { mode: "math", auto: true } },
   { trigger: ["ber", "Ber"], replacement: "\\operatorname{Ber}", options: { mode: "math", auto: true } },
@@ -217,11 +216,13 @@ const rawSnippets = [
   { trigger: "-+", replacement: "\\mp", options: { mode: "math", auto: true } },
   { trigger: "...", replacement: "\\dots $0", options: { mode: "math", auto: true } },
   { trigger: ["nabl", "del"], replacement: "\\nabla", options: { mode: "math", auto: true } },
+  { trigger:  "dal", replacement: "\\square", options: { mode: "math", auto: true } },
   { trigger: ["xx", "times"], replacement: "\\times $0", options: { mode: "math", auto: true } },
   { trigger: ["**", "cdot"], replacement: "\\cdot $0", options: { mode: "math", auto: true } },
   { trigger: ["otimes", "ox"], replacement: "\\otimes $0", options: { mode: "math", auto: true } },
+  { trigger:  "box", replacement: "\\boxed { $0 }", options: { mode: "math", auto: true }, priority: 1},
   { trigger: ["oplus", "o+"], replacement: "\\oplus $0", options: { mode: "math", auto: true } },
-  { trigger: "para", replacement: "\\parallel $0", options: { mode: "math", auto: true } },
+  { trigger: "prl", replacement: "\\parallel $0", options: { mode: "math", auto: true } },
 
   // ----------------------------------------
   // Relations
@@ -283,7 +284,6 @@ const rawSnippets = [
   // ----------------------------------------
   // Derivatives and Integrals
   // ----------------------------------------
-  { trigger: "par", replacement: "\\frac{ \\partial ${0:y} }{ \\partial ${1:x} } $2", options: { mode: "math", auto: false } },
   { trigger: /pa([A-Za-z])([A-Za-z])/, replacement: "\\frac{ \\partial [[0]] }{ \\partial [[1]] } ", options: { mode: "math", auto: false } },
   { trigger: "ddt", replacement: "\\frac{d}{dt} ", options: { mode: "math", auto: true } },
 
@@ -360,19 +360,11 @@ const rawSnippets = [
   // Function replacements receive ([selectedText]) and return a string template.
   // ----------------------------------------
 
-  // Detects tall symbols that need \left/\right sizing (same set as extension.js)
-  // defined here to avoid a circular import with extension.js
-  ...(() => {
-    const TALL_RE = /\\(frac|dfrac|tfrac|sum|prod|int|oint|iint|iiint|lim|bigcup|bigcap|bigoplus|bigotimes|bigvee|bigwedge)/;
-    const tall = (v) => TALL_RE.test(v);
-    return [
-      { trigger: "/", replacement: "\\frac{[[VISUAL]]}{$0}$1", options: { mode: "math", visual: true } },
-      { trigger: "(", replacement: ([v]) => tall(v) ? `\\left(${v}\\right)$0`   : `(${v})$0`,       options: { mode: "math", visual: true } },
-      { trigger: "[", replacement: ([v]) => tall(v) ? `\\left[${v}\\right]$0`   : `[${v}]$0`,       options: { mode: "math", visual: true } },
-      { trigger: "{", replacement: ([v]) => tall(v) ? `\\left\\{${v}\\right\\}$0` : `\\{${v}\\}$0`, options: { mode: "math", visual: true } },
-      { trigger: "|", replacement: ([v]) => tall(v) ? `\\left|${v}\\right|$0`   : `|${v}|$0`,       options: { mode: "math", visual: true } },
-    ];
-  })(),
+  { trigger: "/", replacement: "\\frac{[[VISUAL]]}{$0}$1", options: { mode: "math", visual: true } },
+  { trigger: "(", replacement: ([v]) => containsTallOp(v) ? `\\left( ${v} \\right)$0`   : `(${v})$0`,       options: { mode: "math", visual: true } },
+  { trigger: "[", replacement: ([v]) => containsTallOp(v) ? `\\left[ ${v} \\right]$0`   : `[${v}]$0`,       options: { mode: "math", visual: true } },
+  { trigger: "{", replacement: ([v]) => containsTallOp(v) ? `\\left\\{ ${v} \\right\\}$0` : `\\{${v}\\}$0`, options: { mode: "math", visual: true } },
+  { trigger: "|", replacement: ([v]) => containsTallOp(v) ? `\\left| ${v} \\right|$0`   : `|${v}|$0`,       options: { mode: "math", visual: true } },
 
   { trigger: "U", replacement: "\\underbrace{ [[VISUAL]] }_{ $0 }", options: { mode: "math", visual: true } },
   { trigger: "O", replacement: "\\overbrace{ [[VISUAL]] }^{ $0 }",  options: { mode: "math", visual: true } },
@@ -380,7 +372,7 @@ const rawSnippets = [
   { trigger: "C", replacement: "\\cancel{ [[VISUAL]] }",            options: { mode: "math", visual: true } },
   { trigger: "K", replacement: "\\cancelto{ $0 }{ [[VISUAL]] }",    options: { mode: "math", visual: true } },
   { trigger: "S", replacement: "\\sqrt{ [[VISUAL]] }",              options: { mode: "math", visual: true } },
-
+  { trigger: "X", replacement: "\\boxed{ [[VISUAL]] }",              options: { mode: "math", visual: true } },
   // ----------------------------------------
   // Brackets
   // ----------------------------------------

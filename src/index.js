@@ -19,14 +19,52 @@ let registered = false;
 // CM6 MODULE EXTRACTION
 // ========================================
 
+function pickIsolateHistory(o) {
+  if (!o) return null;
+  if (o.isolateHistory && typeof o.isolateHistory.of === 'function') return o.isolateHistory;
+  if (o.commands?.isolateHistory && typeof o.commands.isolateHistory.of === 'function') {
+    return o.commands.isolateHistory;
+  }
+  return null;
+}
+
+/**
+ * @param {Record<string, unknown>} detail - UNSTABLE_editor event.detail or {}
+ */
+function resolveIsolateHistory(detail = {}) {
+  return (
+    pickIsolateHistory(detail)
+    || pickIsolateHistory(detail.CodeMirror)
+    || pickIsolateHistory(detail.commands)
+    || pickIsolateHistory(window.CodeMirror)
+    || pickIsolateHistory(window.CM?.commands)
+    || pickIsolateHistory(window.CM)
+    || null
+  );
+}
+
 /**
  * Try to find CM6 modules from the event detail or window globals.
- * Returns an object with { EditorView, StateField, StateEffect, keymap, Prec }
+ * Returns an object with { EditorView, StateField, StateEffect, keymap, Prec, isolateHistory? }
  * or null if the required modules cannot be found.
  */
 function extractCodeMirrorModules(detail = {}) {
-  if (detail.CodeMirror) return detail.CodeMirror;
-  if (window.CodeMirror) return window.CodeMirror;
+  const isolateHistory = resolveIsolateHistory(detail);
+  const attach = (CMOrPartial) => {
+    if (!CMOrPartial) return null;
+    const ih =
+      isolateHistory
+      || pickIsolateHistory(CMOrPartial)
+      || null;
+    return ih ? { ...CMOrPartial, isolateHistory: ih } : { ...CMOrPartial };
+  };
+
+  if (detail.CodeMirror && detail.CodeMirror.EditorView) {
+    return attach(detail.CodeMirror);
+  }
+  if (window.CodeMirror && window.CodeMirror.EditorView) {
+    return attach(window.CodeMirror);
+  }
 
   const EditorView  = detail.EditorView  || window.EditorView  || window.CM?.view?.EditorView;
   const StateField  = detail.StateField  || window.StateField  || window.CM?.state?.StateField;
@@ -35,7 +73,10 @@ function extractCodeMirrorModules(detail = {}) {
   const Prec        = detail.Prec        || window.Prec        || window.CM?.state?.Prec;
 
   if (EditorView && StateField && StateEffect && keymap) {
-    return { EditorView, StateField, StateEffect, keymap, Prec };
+    const CM = { EditorView, StateField, StateEffect, keymap, Prec };
+    const ih = isolateHistory || pickIsolateHistory(CM) || null;
+    if (ih) CM.isolateHistory = ih;
+    return CM;
   }
 
   return null;
