@@ -1,18 +1,31 @@
 {
-  "manifest_version": 3,
-  "name": "TeXpress",
-  "description": "An extension that allows you to write LaTeX math in Overleaf faster and easier using shortcuts.",
-  "version": "1.0.0",
-  "content_scripts": [
-      {
-          "matches": [
-              "https://www.overleaf.com/project/*"
-          ],
-          "js": [
-              "bundle.js"
-          ],
-          "run_at": "document_idle",
-          "world": "MAIN"
-      }
-  ]
+    "manifest_version": 3,
+    "name": "TeXpress",
+    "description": "An extension that allows you to write LaTeX math in Overleaf faster and easier using shortcuts.",
+    "version": "1.0.0",
+    "icons": {
+        "16": "icon16.png",
+        "48": "icon128.png",
+        "128": "icon128.png"
+    },
+    "action": {
+        "default_icon": {
+            "16": "icon16.png",
+            "48": "icon128.png",
+            "128": "icon128.png"
+        },
+        "default_title": "TeXpress is active"
+    },
+    "content_scripts": [
+        {
+            "matches": [
+                "https://www.overleaf.com/project/*"
+            ],
+            "js": [
+                "bundle.js"
+            ],
+            "run_at": "document_idle",
+            "world": "MAIN"
+        }
+    ]
 }
