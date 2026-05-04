@@ -4,14 +4,14 @@
     "description": "An extension that allows you to write LaTeX math in Overleaf faster and easier using shortcuts.",
     "version": "1.0.0",
     "icons": {
-        "16": "icon128.png",
+        "16": "icon16.png",
         "48": "icon128.png",
         "128": "icon128.png"
     },
     "action": {
         "default_icon": {
             "16": "icon16.png",
-            "48": "icon48.png",
+            "48": "icon128.png",
             "128": "icon128.png"
         },
         "default_title": "TeXpress is active"
