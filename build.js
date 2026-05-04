@@ -3,7 +3,7 @@
  *
  * Bundles ES modules into a single IIFE and distributes it to:
  *   - dist/texpress.user.js       (Tampermonkey userscript)
- *   - chrome-extension/content.js (Chrome extension content script)
+ *   - chrome-extension/bundle.js  (Chrome extension content script)
  *   - mozilla-addon/content.js    (Firefox addon content script)
  *
  * Usage:
@@ -18,7 +18,7 @@ const ENTRY_POINT = 'src/index.js';
 const BUNDLE_OUTPUT = 'dist/bundle.js';
 const USERSCRIPT_OUTPUT = 'dist/texpress.user.js';
 const HEADER_FILE = 'userscript-header.js';
-const CHROME_CONTENT = 'chrome-extension/content.js';
+const CHROME_CONTENT = 'chrome-extension/bundle.js';
 const FIREFOX_CONTENT = 'mozilla-addon/content.js';
 
 function writeOutputs() {

@@ -3,7 +3,7 @@ node_modules/
 
 # Build output
 dist/
-chrome-extension/content.js
+chrome-extension/bundle.js
 mozilla-addon/content.js
 
 # OS files
