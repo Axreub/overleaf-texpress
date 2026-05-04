@@ -1,0 +1,24 @@
+{
+  "manifest_version": 2,
+  "name": "TeXpress",
+  "version": "2.0.0",
+  "description": "Intuitive and fast snippet expansion for Overleaf (CodeMirror 6 native)",
+  "author": "Axel Riley, Hugo Rippe, Edvard Oxelström, Kevin Hamed",
+  "homepage_url": "https://github.com/texpress",
+  "browser_specific_settings": {
+    "gecko": {
+      "id": "tex@cognicene.com",
+      "data_collection_permissions": {
+        "required": ["none"],
+        "optional": []
+      }
+    }
+  },
+  "content_scripts": [
+    {
+      "matches": ["https://www.overleaf.com/project/*"],
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ]
+}
