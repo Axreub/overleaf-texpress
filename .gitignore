@@ -3,8 +3,8 @@ node_modules/
 
 # Build output
 dist/
-chrome-extension/bundle.js
-mozilla-addon/content.js
+chrome-extension/*
+mozilla-addon/*
 
 # OS files
 .DS_Store
